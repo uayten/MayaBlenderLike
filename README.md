@@ -25,6 +25,7 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 - [Layout and colors](#layout-and-colors)
 - [Grid](#grid)
 - [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
 - [How it works](#how-it-works)
 - [Compatibility](#compatibility)
 
@@ -238,11 +239,29 @@ GRID_DIVISIONS = 10
 
 To add or change a hotkey, edit the `BINDINGS` list in `scripts/maya_blender_like/hotkeys.py`. Command names are in Maya's `scripts/startup/hotkeySetup.mel`, inside the Maya install folder.
 
+## Troubleshooting
+
+At startup the Script Editor shows one line per feature, `MayaBlenderLike: <feature> applied` or `MayaBlenderLike: <feature> failed: ...`. A failed hotkey lists each binding that didn't take; the others still work.
+
+If hotkeys don't respond, check which hotkey set is active and what each key is bound to. Paste this in the Script Editor's Python tab:
+
+```python
+import maya_blender_like.hotkeys as h; h.report()
+```
+
+Every line should end in `OK`, and the set should be `Blender_Style`. If another set is current (picked in the Hotkey Editor, or created by another script), restart Maya or pick `Blender_Style` in **Windows → Settings/Preferences → Hotkey Editor**.
+
+Maya saves hotkeys and preferences only when it closes normally. After a crash the saved hotkey file stays old, but the module applies its hotkeys again at every start, so that doesn't matter.
+
+To rule the module out when Maya misbehaves, turn features off one at a time in `config.py` (for example `ENABLE_NAVIGATION` and `ENABLE_MODAL_TRANSFORMS`) and restart.
+
 ## How it works
 
 - `install.bat` registers the folder as a Maya module (a `.mod` file), which adds `scripts/` to Maya's Python path.
 - Maya runs every `userSetup.py` found on its Python path at startup. The module's `scripts/userSetup.py` calls `maya_blender_like.startup()` once the UI is ready.
 - Each feature is applied on its own. If one fails, the others still load, and the failure shows as a warning in the Script Editor.
+- Custom commands are Maya runtime commands, listed in the Hotkey Editor under **Custom Scripts → MayaBlenderLike**, so they can be rebound there.
+- G / R / S / E are hotkeys that start the modal transform; the event filter then feeds it the mouse and keyboard until you confirm or cancel.
 - Viewport navigation is a Qt event filter that catches middle-mouse drags over model panels and moves the panel camera with Maya's `tumble`, `track` and `dolly` commands. The same filter catches numpad keys over viewports.
 
 ## Compatibility

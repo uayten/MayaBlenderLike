@@ -330,6 +330,29 @@ def _safely(command, *args, **kwargs):
         cmds.warning("MayaBlenderLike: {}".format(str(error).strip()))
 
 
+FALLBACK_TOOLS = {TRANSLATE: "moveSuperContext", ROTATE: "RotateSuperContext", SCALE: "scaleSuperContext"}
+
+
+def start(mode, extrude=False):
+    """Hotkey entry point: start a modal transform over the viewport under the mouse.
+
+    Outside a viewport, with nothing selected, or (for E) without joints selected, picks Maya's
+    move / rotate / scale tool instead, so the key still does something sensible.
+    """
+    from . import navigation
+    panel = cmds.getPanel(underPointer=True)
+    selection = cmds.ls(selection=True) or []
+    usable = bool(panel and cmds.getPanel(typeOf=panel) == "modelPanel" and selection and navigation.is_installed())
+    if extrude:
+        usable = usable and all(cmds.nodeType(s) == "joint" for s in selection)
+    if not usable:
+        cmds.setToolTo(FALLBACK_TOOLS[ROTATE if extrude else mode])
+        return
+    if extrude:
+        extrude_joints()
+    navigation.start_modal(ModalTransform(mode, panel))
+
+
 def extrude_joints():
     """Blender's E on bones: add a child joint at each selected joint and select the new ones."""
     joints = cmds.ls(selection=True, type="joint", long=True) or []

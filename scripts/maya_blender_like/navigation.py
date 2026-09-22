@@ -30,7 +30,7 @@ try:
 except ImportError:  # Maya 2024 and older ship PySide2
     from PySide2 import QtCore, QtWidgets
 
-from . import config, modal
+from . import config
 
 Qt = QtCore.Qt
 
@@ -65,14 +65,6 @@ VIEW_ROTATIONS = {
     (KEY_7, True): (90, 0, 0),     # bottom: from -Y
 }
 
-KEY_E = _key_value(Qt.Key_E)
-MODAL_START_KEYS = {
-    _key_value(Qt.Key_G): modal.TRANSLATE,
-    _key_value(Qt.Key_R): modal.ROTATE,
-    _key_value(Qt.Key_S): modal.SCALE,
-    KEY_E: modal.TRANSLATE,
-}
-
 # Every input a running modal transform takes over.
 MODAL_EVENTS = (
     QtCore.QEvent.ShortcutOverride, QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease,
@@ -80,7 +72,7 @@ MODAL_EVENTS = (
     QtCore.QEvent.MouseButtonDblClick, QtCore.QEvent.Wheel,
 )
 
-TEXT_INPUT_WIDGETS =(QtWidgets.QLineEdit, QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit, QtWidgets.QAbstractSpinBox)
+TEXT_INPUT_WIDGETS = (QtWidgets.QLineEdit, QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit, QtWidgets.QAbstractSpinBox)
 
 _filter = None
 
@@ -118,8 +110,6 @@ class BlenderNavigationFilter(QtCore.QObject):
             return True
 
         if event_type in (QtCore.QEvent.ShortcutOverride, QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease):
-            if config.ENABLE_MODAL_TRANSFORMS and self._handle_modal_key(event, event_type):
-                return True
             if config.ENABLE_NUMPAD_VIEWS:
                 return self._handle_numpad(event, event_type)
             return False
@@ -166,32 +156,6 @@ class BlenderNavigationFilter(QtCore.QObject):
             return True
 
         return False
-
-    def _handle_modal_key(self, event, event_type):
-        """G / R / S (and E on joints) over a viewport start a Blender-style modal transform."""
-        key = _key_value(event.key())
-        if key not in MODAL_START_KEYS:
-            return False
-        if event.modifiers() & (Qt.ShiftModifier | Qt.ControlModifier | Qt.AltModifier | Qt.KeypadModifier):
-            return False
-        panel = _numpad_panel()
-        if panel is None:
-            return False
-        selection = cmds.ls(selection=True) or []
-        if not selection:
-            return False
-        extrude = key == KEY_E
-        if extrude and not all(cmds.nodeType(s) == "joint" for s in selection):
-            return False  # E on anything else keeps Maya's rotate tool
-
-        if event_type == QtCore.QEvent.ShortcutOverride:
-            event.accept()
-        elif event_type == QtCore.QEvent.KeyPress and not event.isAutoRepeat():
-            if extrude:
-                modal.extrude_joints()
-            transform = modal.ModalTransform(MODAL_START_KEYS[key], panel)
-            self._modal = None if transform.finished else transform
-        return True
 
     def _handle_numpad(self, event, event_type):
         key = _key_value(event.key())
@@ -388,6 +352,16 @@ def _panel_camera(panel):
             return None
         camera = shapes[0]
     return camera
+
+
+def is_installed():
+    return _filter is not None
+
+
+def start_modal(transform):
+    """Route every input to a modal transform started by a hotkey, until it finishes."""
+    if _filter is not None and not transform.finished:
+        _filter._modal = transform
 
 
 def install():
