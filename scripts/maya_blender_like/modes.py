@@ -108,6 +108,17 @@ def go(mode):
     set_mode(mode)
 
 
+def select_all():
+    """Blender's A: every bone of the armature in pose or edit mode, Maya's Select All in object mode."""
+    mode = current_mode()
+    if mode == POSE:
+        cmds.select(sorted(_pose_joints), replace=True)
+    elif mode == EDIT:
+        cmds.select(sorted(_session.joint_set), replace=True)
+    else:
+        mel.eval("SelectAll")
+
+
 def _set_pose_armature(joints):
     global _pose_joints, _pose_rigs
     skeleton = rest.skeleton(joints)

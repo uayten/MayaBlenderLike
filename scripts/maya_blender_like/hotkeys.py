@@ -45,6 +45,8 @@ CUSTOM_COMMANDS = [
      "import maya_blender_like.modes as m; m.tab()"),
     ("MBL_CtrlTab", "Mode menu: object, edit, pose (Blender Ctrl+Tab)",
      "import maya_blender_like.modes as m; m.mode_menu()"),
+    ("MBL_SelectAll", "Select all: armature bones in pose / edit mode, everything in object mode (Blender A)",
+     "import maya_blender_like.modes as m; m.select_all()"),
     ("MBL_AddConstraint", "Add Constraint with Targets (Blender Shift+Ctrl+C)",
      "import maya_blender_like.constraints_panel as p; p.add_constraint_menu()"),
 ]
@@ -79,7 +81,7 @@ def _bindings():
         ("i", {}, "NameComSet_Keyframe", ""),
         ("R", {}, "NameComRepeat_Last_Menu_Action", ""),
         # A select all, Alt+A deselect, Home frame all.
-        ("a", {}, "NameComSelect_All", ""),
+        ("a", {}, "MBL_SelectAllNameCommand", ""),
         ("a", ALT, "NameComSelectNone", ""),
         ("Home", {}, "NameComFit_All_in_Active_Panel_MMenu", "NameComFit_All_in_Active_Panel_MMenu_release"),
         # Shift+D duplicate, Ctrl+P parent, Alt+P unparent.

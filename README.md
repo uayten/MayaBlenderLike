@@ -78,7 +78,7 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 | Tab | Over a viewport: edit mode on a selected rig, back to object mode from edit or pose mode ([details](#edit-mode-and-pose-mode)); object / component toggle on a mesh | F8 (cleared) |
 | Ctrl+Tab | Over a viewport: mode menu (Object, Edit, Pose) | |
 | Shift+Ctrl+C | Add Constraint (with Targets) menu ([details](#constraints-panel)) | Create camera from view |
-| A | Select all | Frame all (moved to Home) |
+| A | Select all: every bone of the armature in pose or edit mode, everything in object mode | Frame all (moved to Home) |
 | Alt+A | Select none | Cycle display mode |
 | Home | Frame all | |
 | Shift+D | Duplicate | Duplicate with transform |
