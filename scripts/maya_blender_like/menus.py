@@ -18,27 +18,31 @@ def _main_window():
     return wrapInstance(int(omui.MQtUtil.mainWindow()), QtWidgets.QWidget)
 
 
-def _popup(title, entries):
-    """Show a menu at the cursor. entries: list of (label, callable), (label, [submenu entries]) or None for a separator."""
+def popup(title, entries, undo=True):
+    """Show a menu at the cursor. entries: list of (label, callable), (label, [submenu entries]) or None for a separator.
+
+    With undo, each chosen action is one undo step.
+    """
     menu = QtWidgets.QMenu(_main_window())
     menu.setTitle(title)
     header = menu.addAction(title)
     header.setEnabled(False)
     menu.addSeparator()
-    _fill(menu, entries)
+    _fill(menu, entries, undo)
     menu.exec_(QtGui.QCursor.pos())
 
 
-def _fill(menu, entries):
+def _fill(menu, entries, undo=True):
     for entry in entries:
         if entry is None:
             menu.addSeparator()
             continue
         label, target = entry
         if isinstance(target, list):
-            _fill(menu.addMenu(label), target)
+            _fill(menu.addMenu(label), target, undo)
         else:
-            menu.addAction(label).triggered.connect(lambda checked=False, action=target: _run(action))
+            run = _run if undo else (lambda action: action())
+            menu.addAction(label).triggered.connect(lambda checked=False, action=target, run=run: run(action))
 
 
 def _run(action):
@@ -65,7 +69,7 @@ def _add_bone():
 
 
 def add_menu():
-    _popup("Add", [
+    popup("Add", [
         ("Mesh", [
             ("Plane", lambda: _add(lambda: cmds.polyPlane(width=200, height=200))),
             ("Cube", lambda: _add(lambda: cmds.polyCube(width=200, height=200, depth=200))),
@@ -117,7 +121,7 @@ def _pose_as_rest():
 
 
 def apply_menu():
-    _popup("Apply", [
+    popup("Apply", [
         ("Location", lambda: _freeze(translate=True)),
         ("Rotation", lambda: _freeze(rotate=True)),
         ("Scale", lambda: _freeze(scale=True)),
@@ -137,6 +141,6 @@ def apply_menu():
 def delete_menu():
     if not cmds.ls(selection=True):
         return
-    _popup("Delete", [
+    popup("Delete", [
         ("Delete", lambda: cmds.delete()),
     ])

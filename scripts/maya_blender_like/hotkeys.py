@@ -41,10 +41,10 @@ CUSTOM_COMMANDS = [
      "from maya import mel; mel.eval('ToggleAttributeEditor')"),
     ("MBL_ToggleGridSnap", "Toggle grid snap (Blender Shift+Tab)",
      "import maya_blender_like.interface as i; i.toggle_grid_snap()"),
-    ("MBL_Tab", "Edit mode on joints, object/component toggle otherwise (Blender Tab)",
+    ("MBL_Tab", "Edit mode on a rig, back to object mode, or object/component toggle (Blender Tab)",
      "import maya_blender_like.modes as m; m.tab()"),
-    ("MBL_CtrlTab", "Leave edit mode to pose mode (Blender Ctrl+Tab)",
-     "import maya_blender_like.modes as m; m.ctrl_tab()"),
+    ("MBL_CtrlTab", "Mode menu: object, edit, pose (Blender Ctrl+Tab)",
+     "import maya_blender_like.modes as m; m.mode_menu()"),
     ("MBL_AddConstraint", "Add Constraint with Targets (Blender Shift+Ctrl+C)",
      "import maya_blender_like.constraints_panel as p; p.add_constraint_menu()"),
 ]

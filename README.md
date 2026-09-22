@@ -70,8 +70,8 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 | Shift+Tab | Toggle grid snap (over a viewport) | |
 | I | Set key | Insert key modifier |
 | Shift+R | Repeat last command | |
-| Tab | Over a viewport: edit mode with joints selected ([details](#edit-mode-and-pose-mode)); object / component toggle otherwise | F8 (cleared) |
-| Ctrl+Tab | Over a viewport: toggle object mode / pose mode; from edit mode, go to pose mode | |
+| Tab | Over a viewport: edit mode on a selected rig, back to object mode from edit or pose mode ([details](#edit-mode-and-pose-mode)); object / component toggle on a mesh | F8 (cleared) |
+| Ctrl+Tab | Over a viewport: mode menu (Object, Edit, Pose) | |
 | Shift+Ctrl+C | Add Constraint (with Targets) menu ([details](#constraints-panel)) | Create camera from view |
 | A | Select all | Frame all (moved to Home) |
 | Alt+A | Select none | Cycle display mode |
@@ -105,29 +105,31 @@ E on selected joints adds a child joint at each one and starts moving it, like e
 
 ## Edit mode and pose mode
 
-Maya has no armature modes: a joint's translate and rotate hold both its rest placement and its pose. The module adds Blender's two modes on top of standard joints.
+Maya has no armature modes: a joint's translate and rotate hold both its rest placement and its pose. The module adds Blender's three modes on top of standard joints:
 
-A label in the top-left corner of the viewport always shows the mode, like Blender's header:
+| Mode | For | What changes |
+|---|---|---|
+| **Object Mode** | Working on the scene | Nothing: Maya as usual. The default |
+| **Pose Mode** | Animating | Only the selected joint highlights, not its whole hierarchy. Meshes can't be picked in the viewport, so clicks land on joints and controls. Alt+G / Alt+R / Alt+S return joints to rest. Stays on with nothing selected |
+| **Edit Mode** | Editing the rig | See below |
 
-| Label | When |
+| Key (over a viewport) | Effect |
 |---|---|
-| Object Mode | Default. Clicking a joint selects its whole skeleton (the top joint), like an armature, and the whole hierarchy highlights |
-| Pose Mode | Joints select one at a time and only the selected one highlights; animate them, Alt+G / Alt+R / Alt+S return to rest. Stays on with nothing selected |
-| Edit Mode - Armature | After Tab on joints: editing the rest |
-| Edit Mode - Mesh | Maya's component mode (Tab on a mesh): vertices, edges, faces |
+| Tab | In object mode with a rig selected (a joint, a group with joints under it, or a control of the rig), enter edit mode. In edit or pose mode, back to object mode. With a mesh selected, Maya's object / component toggle (Blender's mesh edit mode) |
+| Ctrl+Tab | Menu at the cursor to pick Object, Edit or Pose Mode; the current one is marked |
 
-**Ctrl+Tab** toggles object and pose mode, as in Blender. Leaving edit mode returns to the mode you entered it from. Tab, Ctrl+Tab and Shift+Tab act over a viewport: Qt uses Tab to move keyboard focus between widgets before Maya's hotkeys see it, so the module reads these keys in its viewport event filter. Set `ENABLE_ARMATURE_MODES = False` to keep Maya's one-joint-at-a-time selection everywhere.
+The same three modes are in the **Blender Like** menu. A label in the top-left corner of the viewport always shows the mode (Object Mode, Pose Mode, Edit Mode - Rig, Edit Mode - Mesh), while the viewport's Heads Up Display is on (**Display → Heads Up Display**).
 
-The label shows while the viewport's Heads Up Display is on (**Display → Heads Up Display**).
+Tab, Ctrl+Tab and Shift+Tab act over a viewport: Qt uses Tab to move keyboard focus between widgets before Maya's hotkeys see it, so the module reads these keys in its viewport event filter. Set `ENABLE_ARMATURE_MODES = False` to skip pose mode's selection changes.
 
-**Edit mode** (Tab with joints selected, for their whole skeleton):
+**Edit mode** (for the whole skeleton of the selected rig):
 
-- Joints go to their rest pose and are drawn light blue; the label shows **Edit Mode - Armature**.
+- Joints go to their rest pose and are drawn light blue; the label shows **Edit Mode - Rig**.
 - The skin is paused, so the mesh stays still while you move joints, like Blender's edit bones.
 - Moving, rotating or scaling a joint leaves its children in place, with the modal G / R / S and with Maya's own tools.
 - E extrudes new joints.
 
-**Leaving edit mode** (Tab again, or Ctrl+Tab to land in pose mode):
+**Leaving edit mode** (Tab back to object mode, or Ctrl+Tab to pick pose mode):
 
 - The new placement becomes the rest. Rotation goes into jointOrient, so joints at rest read rotate 0, as Maya riggers expect.
 - The skin is rebound at the new rest: the mesh keeps its shape instead of jumping.

@@ -1,22 +1,18 @@
-"""Blender's object mode, pose mode and edit mode for Maya skeletons.
+"""Blender's three modes for Maya: object mode, pose mode and edit mode.
 
-Object mode (default) and pose mode are real states, switched with Ctrl+Tab:
-- Object mode: clicking any joint selects its whole skeleton (the top joint), like selecting
-  an armature; the whole hierarchy highlights.
-- Pose mode: joints are selected one by one and only the selected joint highlights; Alt+G/R/S
-  return joints to rest. Pose mode stays on with nothing selected.
+- Object mode (default): Maya as usual, for working on the scene.
+- Pose mode, for animating: only the selected joint highlights (not its whole hierarchy),
+  meshes can't be picked in the viewport so clicks land on joints and controls, and
+  Alt+G/R/S return joints to their rest.
+- Edit mode, for editing the rig: joints go to their rest pose, the skin is paused so the
+  mesh stays still, moving a joint leaves its children in place, joints are drawn light blue.
+  Leaving it makes the new placement the rest (rotation goes into jointOrient), rebinds the
+  skin so the mesh doesn't jump, and reapplies the pose on top.
 
-Tab with joints selected enters edit mode for their skeleton:
-- joints go to their rest pose, the skin is paused so the mesh stays still,
-- moving or rotating a joint leaves its children in place,
-- the joints are drawn light blue.
-
-Tab again (or Ctrl+Tab) leaves edit mode, back to the mode you came from:
-- the new joint placement becomes the rest (rotation goes into jointOrient),
-- the skin is rebound at the new rest, so the mesh doesn't jump,
-- the pose you had before is reapplied on top of the new rest.
-
-Tab with anything else selected keeps Maya's object / component toggle (Blender's mesh edit mode).
+Tab: from object mode with a rig selected (a joint, or a group or control with joints under
+it), enter edit mode; from edit or pose mode, back to object mode; with a mesh selected, Maya's
+object / component toggle (Blender's mesh edit mode).
+Ctrl+Tab: a menu at the cursor to pick the mode.
 
 A label in the top-left corner of the viewport always says which mode you are in.
 """
@@ -27,14 +23,16 @@ from . import rest
 
 HUD_NAME = "MBL_ModeIndicator"
 EDIT_COLOR = 18   # Maya color index: light blue, like Blender's edit bones
-OBJECT, POSE = "object", "pose"
+OBJECT, POSE, EDIT = "object", "pose", "edit"
+LABELS = {OBJECT: "Object Mode", POSE: "Pose Mode", EDIT: "Edit Mode"}
 
-# selectPref -selectionChildHighlightMode: 0 always highlights children, 1 never.
-HIGHLIGHT_CHILDREN, HIGHLIGHT_SELECTED_ONLY = 0, 1
+# selectPref -selectionChildHighlightMode: 1 highlights only the selected node, not its children.
+HIGHLIGHT_SELECTED_ONLY = 1
+# Selection masks turned off in pose mode, so viewport clicks go to joints and controls.
+POSE_MASKED_TYPES = ("polymesh", "nurbsSurface", "subdiv")
 
 _session = None
 _mode = OBJECT
-_mode_before_edit = OBJECT
 
 
 def is_editing():
@@ -42,37 +40,92 @@ def is_editing():
 
 
 def current_mode():
-    return _mode
+    return EDIT if _session is not None else _mode
 
 
 def tab():
-    if _session is not None:
-        exit_edit()
+    if current_mode() != OBJECT:
+        go(OBJECT)
         return
-    joints = cmds.ls(selection=True, type="joint", long=True)
-    if joints:
-        enter_edit(joints)
+    if rig_joints():
+        go(EDIT)
     else:
         mel.eval("SelectToggleMode")
         _refresh_indicator()
 
 
 def ctrl_tab():
-    """Toggle object / pose mode; from edit mode, go to pose mode."""
-    if _session is not None:
-        exit_edit()
-        set_mode(POSE)
+    mode_menu()
+
+
+def mode_menu():
+    """Blender's Ctrl+Tab: pick the mode from a menu at the cursor."""
+    from . import menus
+    current = current_mode()
+    entries = []
+    for mode in (OBJECT, EDIT, POSE):
+        mark = "●  " if mode == current else "     "   # filled circle marks the current mode
+        entries.append((mark + LABELS[mode], lambda m=mode: go(m)))
+    menus.popup("Mode", entries, undo=False)
+
+
+def go(mode):
+    """Switch to object, pose or edit mode from whatever mode is current."""
+    if mode == current_mode():
         return
-    set_mode(OBJECT if _mode == POSE else POSE)
+    if mode == EDIT:
+        joints = rig_joints()
+        if not joints:
+            cmds.warning("Edit Mode: select the rig first (a joint, or a group or control with joints under it).")
+            return
+        if _mode == POSE:
+            set_mode(OBJECT)
+        enter_edit(joints)
+        return
+    exit_edit()
+    set_mode(mode)
+
+
+def rig_joints():
+    """Joints in the selection, under the selected groups, or in the rig a selected control belongs to."""
+    selection = cmds.ls(selection=True, long=True) or []
+    joints = cmds.ls(selection, type="joint", long=True)
+    if joints:
+        return joints
+    transforms = cmds.ls(selection, transforms=True, long=True)
+    if not transforms:
+        return []
+    found = cmds.listRelatives(transforms, allDescendents=True, type="joint", fullPath=True) or []
+    if found:
+        return found
+    # A control (curve) has no joints under it: take the joints of the top group it lives in (RIG|CTRL|...).
+    controls = [t for t in transforms if cmds.listRelatives(t, shapes=True, type="nurbsCurve")]
+    tops = sorted({"|" + c.split("|")[1] for c in controls})
+    if not tops:
+        return []
+    return cmds.listRelatives(tops, allDescendents=True, type="joint", fullPath=True) or []
 
 
 def set_mode(mode):
+    """Object or pose mode (edit mode goes through enter_edit)."""
     global _mode
     _mode = mode
-    _set_child_highlight(HIGHLIGHT_CHILDREN if mode == OBJECT else HIGHLIGHT_SELECTED_ONLY)
-    if mode == OBJECT:
-        _select_armatures()
+    posing = mode == POSE
+    _set_child_highlight(HIGHLIGHT_SELECTED_ONLY if posing else _user_child_highlight())
+    for kind in POSE_MASKED_TYPES:
+        try:
+            cmds.selectType(**{kind: not posing})
+        except (RuntimeError, TypeError):
+            pass
     _refresh_indicator()
+
+
+def _user_child_highlight():
+    # Object mode shows the user's own preference (Preferences > Selection).
+    try:
+        return cmds.optionVar(query="selectionChildHighlightMode")
+    except RuntimeError:
+        return 0
 
 
 def _set_child_highlight(value):
@@ -82,33 +135,15 @@ def _set_child_highlight(value):
         pass  # not available in batch mode
 
 
-def _select_armatures():
-    """Object mode: a selected joint stands for its whole skeleton, like Blender's armature object."""
-    selection = cmds.ls(selection=True, long=True) or []
-    joints = cmds.ls(selection, type="joint", long=True)
-    if not joints:
-        return
-    wanted = [s for s in selection if s not in joints] + rest.roots(joints)
-    if set(wanted) != set(selection):
-        cmds.select(wanted, replace=True)
-
-
-def _on_selection_changed():
-    if _mode == OBJECT and _session is None:
-        _select_armatures()
-
-
 def install():
-    """Start in object mode, keep selections consistent with it, and show the mode indicator."""
-    cmds.scriptJob(event=["SelectionChanged", _on_selection_changed])
+    """Start in object mode."""
     set_mode(OBJECT)
 
 
 def enter_edit(joints):
-    global _session, _mode_before_edit
+    global _session
     if _session is not None:
         return
-    _mode_before_edit = _mode
     cmds.undoInfo(openChunk=True, chunkName="enter_edit_mode")
     try:
         _session = EditSession(rest.skeleton(joints))
@@ -128,7 +163,7 @@ def exit_edit():
         session.finish()
     finally:
         cmds.undoInfo(closeChunk=True)
-    set_mode(_mode_before_edit)
+    _refresh_indicator()
 
 
 def apply_pose_as_rest(joints):
@@ -223,14 +258,14 @@ def _tool_preserve_children(enabled):
 def mode_text():
     """The mode shown in the viewport corner, as in Blender's header."""
     if _session is not None:
-        return "Edit Mode  -  Armature    (Tab: leave)"
+        return "Edit Mode  -  Rig    (Tab: object mode, Ctrl+Tab: modes)"
     selection = cmds.ls(selection=True) or []
     # Component mode, or components selected (vertices, edges, faces: "mesh.vtx[3]").
     if cmds.selectMode(query=True, component=True) or any("." in s for s in selection):
         return "Edit Mode  -  Mesh    (Tab: leave)"
     if _mode == POSE:
-        return "Pose Mode    (Ctrl+Tab: object mode, Tab: edit)"
-    return "Object Mode    (Ctrl+Tab: pose mode)"
+        return "Pose Mode    (Tab: object mode, Ctrl+Tab: modes)"
+    return "Object Mode    (Tab: edit rig, Ctrl+Tab: modes)"
 
 
 def install_indicator():

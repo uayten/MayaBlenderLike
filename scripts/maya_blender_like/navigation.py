@@ -188,7 +188,8 @@ class BlenderNavigationFilter(QtCore.QObject):
             if _key_value(event.key()) == KEY_BACKTAB or modifiers & Qt.ShiftModifier:
                 interface.toggle_grid_snap()
             elif modifiers & Qt.ControlModifier:
-                modes.ctrl_tab()
+                # Open the menu after this key event returns: a menu's own event loop inside a filter is fragile.
+                QtCore.QTimer.singleShot(0, modes.mode_menu)
             else:
                 modes.tab()
         return True
