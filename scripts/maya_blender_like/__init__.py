@@ -27,6 +27,7 @@ def startup():
     _run("armature in front", lambda: _import("custom_shapes").install())
     if config.ENABLE_ARMATURE_MODES:
         _run("object / pose modes", lambda: _import("modes").install())
+    _run("3D cursor", lambda: _import("cursor").install())
 
     # lowestPriority: runs only when Maya's queue is empty, i.e. after the plugins finish loading.
     cmds.evalDeferred(_start_viewport_filter, lowestPriority=True)

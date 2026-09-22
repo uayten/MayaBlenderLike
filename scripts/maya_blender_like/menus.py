@@ -1,4 +1,7 @@
-"""Blender-style popup menus at the mouse cursor: Shift+A (Add), Ctrl+A (Apply), X (Delete)."""
+"""Blender-style popup menus at the mouse cursor: Shift+A (Add), Ctrl+A (Apply), X (Delete).
+
+Shift+A adds at the 3D cursor (cursor.py), like Blender.
+"""
 from maya import cmds, mel
 
 try:
@@ -56,15 +59,21 @@ def _run(action):
 # --- Shift+A: Add ---
 
 def _add(create):
+    from . import cursor
     # New objects must not be parented under the selection (cmds.joint parents to a selected joint).
     cmds.select(clear=True)
     create()
+    created = cmds.ls(selection=True, transforms=True, long=True) or []
+    if created:
+        cmds.move(*cursor.position(), created, absolute=True, worldSpace=True)
 
 
 def _add_bone():
+    from . import cursor
+    x, y, z = cursor.position()
     cmds.select(clear=True)
-    head = cmds.joint(position=(0, 0, 0))
-    cmds.joint(position=(0, BONE_LENGTH_CM, 0))
+    head = cmds.joint(position=(x, y, z))
+    cmds.joint(position=(x, y + BONE_LENGTH_CM, z))
     cmds.select(head)
 
 

@@ -3,11 +3,12 @@
 Makes Autodesk Maya feel like Blender, installed in one step and restored in one step after reinstalling Maya:
 
 - **Viewport navigation without Alt**: middle mouse orbits, Shift + middle pans, Ctrl + middle dollies
-- **Numpad views**: 1 / 3 / 7 for front, right and top in orthographic, Ctrl for the opposite side, 5 to toggle orthographic and perspective, `.` to frame the selection
+- **Numpad views**: 1 / 3 / 7 for front, right and top in orthographic, Ctrl for the opposite side, 5 to toggle orthographic and perspective, `.` to frame the selection, / for local view
 - **Edit mode and pose mode for skeletons**: Tab on joints edits the rest with the mesh standing still, then rebinds the skin; Alt+G / Alt+R / Alt+S return to that rest
 - **Custom shapes for joints and controls**: bone, circle, square, cube, sphere, diamond, arrow or any curve of yours, scaled by bone length, bone hidden; plain Maya data that works for anyone who opens the file
-- **Convert a Blender skeleton into a Maya rig**: one click gives every bone a control that reads 0 / 0 / 1 at rest, like a Blender pose bone, and moves mechanism chains out of the exported skeleton
+- **Convert a Blender skeleton into a Maya rig**: one click gives every bone a control that reads 0 / 0 / 1 at rest, like a Blender pose bone, with display layers and IK on controls; a Blender add-on brings the locks, bone collections (M), custom shapes and constraints that FBX drops
 - **Armature In Front**: see the rig through meshes
+- **3D cursor**: Shift + right click places it, Shift+S snaps to and from it, Shift+A adds there
 - **Constraints panel with Blender's stack**: Blender constraint names, top-to-bottom order, influence, Apply, built from standard Maya nodes
 - **Modal transforms**: G / R / S follow the mouse, X / Y / Z lock an axis, type a value, click to confirm, right-click to cancel; E extrudes joints like bones
 - **Blender hotkeys and menus**: Shift+A add, Ctrl+A apply, X delete, H / Shift+H / Alt+H hide and reveal, Alt+G / Alt+R / Alt+S clear transforms, Tab for components, A to select all, Shift+D to duplicate, Ctrl+P to parent, N for the sidebar, and more
@@ -30,6 +31,7 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 - [Convert to a MayaBlenderLike rig](#convert-to-a-mayablenderlike-rig)
 - [Viewport navigation](#viewport-navigation)
 - [Numpad views](#numpad-views)
+- [3D cursor](#3d-cursor)
 - [Layout and colors](#layout-and-colors)
 - [Grid](#grid)
 - [Configuration](#configuration)
@@ -67,7 +69,7 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 | G / R / S | Modal move / rotate / scale over a viewport ([details](#modal-transforms)); Maya's tools outside viewports; nothing with nothing selected | Repeat last (moved to Shift+R), scale tool, set key (moved to I) |
 | E | Extrude selected joints ([details](#modal-transforms)); Maya's rotate tool otherwise | |
 | Alt+G / Alt+R / Alt+S | Clear location / rotation / scale | HumanIK full body key (Alt+S) |
-| Shift+A | Add menu: mesh, curve, empty, armature, camera, light | Frame all in all views |
+| Shift+A | Add menu at the 3D cursor: mesh, curve, empty, armature, camera, light | Frame all in all views |
 | Ctrl+A | Apply menu: freeze location / rotation / scale, center pivot, delete history | Attribute Editor (moved to Shift+N) |
 | X | Delete menu (Delete deletes directly) | Hold for grid snap (now Shift+Tab) |
 | H | Hide selected | Toggle visibility |
@@ -82,6 +84,9 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 | Ctrl+Tab | Over a viewport: mode menu (Object, Edit, Pose) | |
 | Shift+Ctrl+C | Add Constraint (with Targets) menu ([details](#constraints-panel)) | Create camera from view |
 | M | Bone collections menu: move to, select, show / hide ([details](#bone-collections)) | |
+| Shift+S | Snap menu: selection and [3D cursor](#3d-cursor) | Keyframe tangent marking menu |
+| Shift + right click | Place the [3D cursor](#3d-cursor) (over a viewport) | Maya's Shift + right click marking menu |
+| Numpad / | Local view (Isolate Select), over a viewport | |
 | A | Select all: every bone of the armature in pose or edit mode, everything in object mode | Frame all (moved to Home) |
 | Alt+A | Select none | Cycle display mode |
 | Home | Frame all | |
@@ -91,7 +96,7 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 
 W keeps Maya's move manipulator for when you want to drag handles. E is extrude on joints and Maya's rotate tool otherwise.
 
-Maya's own keys for actions these keys already cover are cleared in this set, so each action has one key: Ctrl+D (use Shift+D), P and Shift+P (use Ctrl+P and Alt+P), Ctrl+H (use H), Alt+D (use Alt+A), Ctrl+Shift+A (use A), F8 (use Tab) and F (use `.`). Editor-specific keys, like F in the Graph Editor, stay. Shift+A adds objects at the origin, sized in centimeters like Blender's defaults in meters (a 1 m bone is 100 cm).
+Maya's own keys for actions these keys already cover are cleared in this set, so each action has one key: Ctrl+D (use Shift+D), P and Shift+P (use Ctrl+P and Alt+P), Ctrl+H (use H), Alt+D (use Alt+A), Ctrl+Shift+A (use A), F8 (use Tab) and F (use `.`). Editor-specific keys, like F in the Graph Editor, stay. Shift+A adds objects at the [3D cursor](#3d-cursor), sized in centimeters like Blender's defaults in meters (a 1 m bone is 100 cm).
 
 Alt+G / Alt+R / Alt+S skip locked and driven channels and can be undone in one step. When every channel is locked or driven they say so and add nothing to the undo queue.
 
@@ -328,12 +333,27 @@ Press the keys with the mouse over a viewport, as in Blender.
 | Ctrl + Numpad 7 | Bottom |
 | Numpad 5 | Toggle orthographic / perspective, keeping the framing |
 | `.` (numpad or main keyboard) | Frame selected, same as Maya's F |
+| Numpad / | Local view: only the selection in this viewport, framed (Maya's Isolate Select); again to show everything |
 
 Like Blender's Auto Perspective, a view that went orthographic through 1, 3 or 7 returns to perspective when you orbit. A view made orthographic with 5 stays orthographic while orbiting.
 
 The views move the viewport's own camera around the current view center. Maya's front, side and top cameras are untouched. Views follow Blender's axes after an FBX export: Blender's front arrives in Maya facing +Z, which is Maya's front.
 
 Maya's hotkeys can't tell the numpad from the number row, so the numpad is handled by the navigation filter. The number row keeps its Maya hotkeys (1 / 2 / 3 smoothness, 4 / 5 / 6 / 7 display modes). The numpad works with Num Lock on or off, and it's ignored while typing in a text field.
+
+## 3D cursor
+
+Blender's 3D cursor: a point in the scene where Shift+A adds objects and that Shift+S snaps to and from. It's drawn as a red ring with a white cross, always on top, and can't be clicked.
+
+| Input | Effect |
+|---|---|
+| Shift + right click in a viewport | Place the cursor on the mesh surface under the mouse, or at its current depth when there is none |
+| Shift+S | Snap menu: Selection to Cursor, Selection to Cursor (Keep Offset), Selection to Active, Selection to Grid, Cursor to Selected, Cursor to Active, Cursor to World Origin, Cursor to Grid |
+| Shift+A | Adds at the cursor |
+
+Selection to Cursor puts each object's pivot on the cursor, or each selected vertex. Selection to Grid uses the grid's minor spacing (10 cm by default). Joints that follow a control move the control, as with G.
+
+The cursor's position is saved in the scene and comes back when it opens. The marker itself is never saved (Maya's doNotWrite) and is hidden from the Outliner, so the file stays clean for anyone without this module. Moving the cursor isn't an undo step, as in Blender. The cursor has no rotation yet.
 
 ## Layout and colors
 

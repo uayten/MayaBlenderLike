@@ -294,11 +294,7 @@ class ModalTransform(object):
         return axis if axis * toward_viewer >= 0 else -axis
 
     def _mouse(self):
-        """Cursor in M3dView port coordinates (pixels, origin bottom-left)."""
-        widget = wrapInstance(int(self.view.widget()), QtWidgets.QWidget)
-        local = widget.mapFromGlobal(QtGui.QCursor.pos())
-        ratio = self.view.portWidth() / float(max(widget.width(), 1))
-        return (local.x() * ratio, self.view.portHeight() - local.y() * ratio)
+        return view_mouse(self.view)
 
     def _to_screen(self, point):
         result = self.view.worldToView(om.MPoint(point))
@@ -338,6 +334,14 @@ def _axis_color(axis):
     except (RuntimeError, TypeError):
         rgb = None   # not available in batch mode
     return tuple(rgb) if rgb else DEFAULT_AXIS_COLORS[axis]
+
+
+def view_mouse(view):
+    """Cursor in M3dView port coordinates (pixels, origin bottom-left)."""
+    widget = wrapInstance(int(view.widget()), QtWidgets.QWidget)
+    local = widget.mapFromGlobal(QtGui.QCursor.pos())
+    ratio = view.portWidth() / float(max(widget.width(), 1))
+    return (local.x() * ratio, view.portHeight() - local.y() * ratio)
 
 
 def _view_ray(view, mouse):

@@ -51,6 +51,8 @@ CUSTOM_COMMANDS = [
      "import maya_blender_like.constraints_panel as p; p.add_constraint_menu()"),
     ("MBL_BoneCollections", "Bone collections: move to, select, show / hide (Blender M)",
      "import maya_blender_like.bone_collections as b; b.menu()"),
+    ("MBL_SnapMenu", "Snap menu: selection and 3D cursor (Blender Shift+S)",
+     "import maya_blender_like.cursor as c; c.snap_menu()"),
 ]
 
 ALT = {"altModifier": True}
@@ -105,6 +107,8 @@ def _bindings():
         ("C", CTRL, "MBL_AddConstraintNameCommand", ""),
         # M: bone collections (Maya selection sets).
         ("m", {}, "MBL_BoneCollectionsNameCommand", ""),
+        # Shift+S: snap menu (3D cursor).
+        ("S", {}, "MBL_SnapMenuNameCommand", ""),
     ]
 
 

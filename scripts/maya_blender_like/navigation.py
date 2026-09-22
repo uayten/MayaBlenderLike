@@ -13,7 +13,10 @@ Numpad keys over a viewport work like Blender's:
     1 / 3 / 7         -> front / right / top, orthographic
     Ctrl + 1 / 3 / 7  -> back / left / bottom, orthographic
     5                 -> toggle orthographic / perspective
+    /                 -> local view (Maya's Isolate Select), framed on the selection
     . (numpad or row) -> frame selected
+
+Shift + right click places the 3D cursor (cursor.py).
 
 Maya's hotkeys can't tell the numpad from the number row, so the numpad is
 handled here and the number row keeps its Maya hotkeys.
@@ -44,6 +47,7 @@ def _key_value(key):
 
 KEY_1, KEY_3, KEY_5, KEY_7 = (_key_value(k) for k in (Qt.Key_1, Qt.Key_3, Qt.Key_5, Qt.Key_7))
 KEY_PERIOD = _key_value(Qt.Key_Period)
+KEY_SLASH = _key_value(Qt.Key_Slash)
 KEY_TAB, KEY_BACKTAB = _key_value(Qt.Key_Tab), _key_value(Qt.Key_Backtab)
 
 # With Num Lock off the numpad sends navigation keys instead of digits.
@@ -127,6 +131,16 @@ class BlenderNavigationFilter(QtCore.QObject):
                 return self._handle_numpad(event, event_type)
             return False
 
+        if (event_type == QtCore.QEvent.MouseButtonPress and event.button() == Qt.RightButton
+                and event.modifiers() == Qt.ShiftModifier and self._mode is None):
+            panel = _viewport_panel(obj)
+            if panel is None:
+                return False
+            from . import cursor
+            cursor.place_at_mouse(panel)
+            self._swallow_release = True   # Maya's Shift + right click menu must not open on release
+            return True
+
         if event_type == QtCore.QEvent.MouseButtonPress:
             if event.button() != Qt.MiddleButton or self._mode is not None:
                 return False
@@ -198,7 +212,7 @@ class BlenderNavigationFilter(QtCore.QObject):
         key = _key_value(event.key())
         if event.modifiers() & Qt.KeypadModifier:
             key = NUMLOCK_OFF_KEYS.get(key, key)
-            if key not in (KEY_1, KEY_3, KEY_5, KEY_7, KEY_PERIOD):
+            if key not in (KEY_1, KEY_3, KEY_5, KEY_7, KEY_PERIOD, KEY_SLASH):
                 return False
         elif key != KEY_PERIOD:
             # The number row keeps its Maya hotkeys; only "." is shared with the numpad.
@@ -216,6 +230,8 @@ class BlenderNavigationFilter(QtCore.QObject):
             opposite = bool(event.modifiers() & Qt.ControlModifier)
             if key == KEY_PERIOD:
                 _without_undo(lambda: frame_selected(panel))
+            elif key == KEY_SLASH:
+                _without_undo(lambda: toggle_local_view(panel))
             elif key == KEY_5:
                 _without_undo(lambda: toggle_orthographic(camera))
             else:
@@ -272,6 +288,17 @@ def frame_selected(panel):
     """Frame the selection in the given viewport, the same way Maya's F does."""
     cmds.setFocus(panel)
     mel.eval("fitPanel -selectedNoChildren")
+
+
+def toggle_local_view(panel):
+    """Blender's local view: only the selection in this viewport, framed; again to show everything."""
+    if cmds.isolateSelect(panel, query=True, state=True):
+        mel.eval('enableIsolateSelect "{}" 0'.format(panel))
+        return
+    if not cmds.ls(selection=True):
+        return
+    mel.eval('enableIsolateSelect "{}" 1'.format(panel))
+    frame_selected(panel)
 
 
 def toggle_orthographic(camera):
