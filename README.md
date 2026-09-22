@@ -118,14 +118,16 @@ Maya has no armature modes: a joint's translate and rotate hold both its rest pl
 
 | Mode | For | What changes |
 |---|---|---|
-| **Object Mode** | Working on the scene | Nothing: Maya as usual. The default |
-| **Pose Mode** | Animating | Only the selected joint highlights, not its whole hierarchy. Meshes can't be picked in the viewport, so clicks land on joints and controls. Alt+G / Alt+R / Alt+S return joints to rest. Stays on with nothing selected |
-| **Edit Mode** | Editing the rig | See below |
+| **Object Mode** | Working on the scene | Maya as usual, except that joints can't be selected, so they can't be moved or rotated here. The default |
+| **Pose Mode** | Animating | Only joints and controls (curves) can be selected. Only the selected joint highlights, not its whole hierarchy. Alt+G / Alt+R / Alt+S return joints to rest. Stays on with nothing selected |
+| **Edit Mode** | Editing the rig | Only the joints of the rig being edited can be selected. See below |
 
 | Key (over a viewport) | Effect |
 |---|---|
 | Tab | In object mode with a rig selected (a joint, a group with joints under it, or a control of the rig), enter edit mode. In edit or pose mode, back to object mode. With a mesh selected, Maya's object / component toggle (Blender's mesh edit mode) |
 | Ctrl+Tab | Menu at the cursor to pick Object, Edit or Pose Mode; the current one is marked |
+
+The rules hold everywhere: the viewport's selection masks stop the click, and the selection is checked after every change, so picks from the Outliner or scripts are corrected too. Anything a mode forbids is dropped from the selection with a note in the viewport, and the correction adds no undo step.
 
 The same three modes are in the **Blender Like** menu. A label in the top-left corner of the viewport always shows the mode (Object Mode, Pose Mode, Edit Mode - Rig, Edit Mode - Mesh), with the active object's name under it (`Bone: root` for a joint, `Active: CTRL_main` otherwise, plus how many others are selected), while the viewport's Heads Up Display is on (**Display → Heads Up Display**).
 
@@ -216,7 +218,7 @@ Blender's Armature → Viewport Display → In Front: see the rig through the me
 
 Blender rigs use non-deforming bones as pivots, targets and helpers. Maya rigs use **locators** (a visible point, good as a constraint target or pivot) or **groups** (an invisible transform, good as an offset). **Blender Like → Mechanism Bones**:
 
-1. **Select Non-Deforming Joints of the Rig**: with the rig (or any part of it) selected, selects the joints that deform no mesh.
+1. **Select Non-Deforming Joints of the Rig**: with the rig (or any part of it) selected, switches to pose mode (joints aren't selectable in object mode) and selects the joints that deform no mesh.
 2. **Convert Selected to Locators** or **Convert Selected to Groups**.
 
 Each converted joint becomes a locator or group:
@@ -226,7 +228,7 @@ Each converted joint becomes a locator or group:
 - still following the bone it hung from (parent and scale constraints with offset), with non-deforming children kept under it,
 - with constraints that used the joint as a target reconnected to it.
 
-Left as joints, and listed in a warning: joints that deform the mesh, joints with deforming joints below them (removing them would cut the skeleton), and joints driven by a constraint. The conversion is one undo step.
+Conversion is refused in edit mode, since it deletes joints that edit mode is holding. Left as joints, and listed in a warning: joints that deform the mesh, joints with deforming joints below them (removing them would cut the skeleton), and joints driven by a constraint. The conversion is one undo step.
 
 ## Viewport navigation
 

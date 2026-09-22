@@ -32,9 +32,11 @@ def mechanism_joints(joints):
 
 
 def select_mechanisms():
-    """Select every non-deforming joint in the selected rig."""
+    """Select every non-deforming joint in the selected rig (switching to pose mode, where joints are selectable)."""
     from . import modes
     found = mechanism_joints(modes.rig_joints())
+    if modes.current_mode() != modes.POSE:
+        modes.go(modes.POSE)
     cmds.select(found, replace=True)
     cmds.headsUpMessage("{} mechanism joints (non-deforming)".format(len(found)), time=2.0)
     return found
@@ -42,6 +44,10 @@ def select_mechanisms():
 
 def convert(joints, kind=LOCATOR):
     """Replace non-deforming joints by locators or groups. Returns the new nodes."""
+    from . import modes
+    if modes.is_editing():
+        cmds.warning("Leave Edit Mode first (Tab): converting deletes joints that edit mode is holding.")
+        return []
     joints = cmds.ls(joints, type="joint", long=True)
     convertible, skipped = [], []
     for joint in joints:

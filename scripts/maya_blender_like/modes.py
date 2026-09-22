@@ -1,10 +1,11 @@
 """Blender's three modes for Maya: object mode, pose mode and edit mode.
 
-- Object mode (default): Maya as usual, for working on the scene.
-- Pose mode, for animating: only the selected joint highlights (not its whole hierarchy),
-  meshes can't be picked in the viewport so clicks land on joints and controls, and
-  Alt+G/R/S return joints to their rest.
-- Edit mode, for editing the rig: joints go to their rest pose, the skin is paused so the
+Each mode only lets you select what Blender's does, from the viewport and from any other
+editor (the selection is checked after every change):
+- Object mode (default): everything but joints, for working on the scene.
+- Pose mode, for animating: joints and controls only; only the selected joint highlights
+  (not its whole hierarchy), and Alt+G/R/S return joints to their rest.
+- Edit mode, for editing the rig: the rig's joints only; joints go to their rest pose, the skin is paused so the
   mesh stays still, moving a joint leaves its children in place, joints are drawn light blue.
   Leaving it makes the new placement the rest (rotation goes into jointOrient), rebinds the
   skin so the mesh doesn't jump, and reapplies the pose on top.
@@ -29,8 +30,18 @@ LABELS = {OBJECT: "Object Mode", POSE: "Pose Mode", EDIT: "Edit Mode"}
 
 # selectPref -selectionChildHighlightMode: 1 highlights only the selected node, not its children.
 HIGHLIGHT_SELECTED_ONLY = 1
-# Selection masks turned off in pose mode, so viewport clicks go to joints and controls.
-POSE_MASKED_TYPES = ("polymesh", "nurbsSurface", "subdiv")
+# What the viewport lets you click in each mode (Maya selection masks). Other editors, like the
+# Outliner, ignore masks, so the selection is also checked after every change.
+SELECTION_MASKS = {
+    OBJECT: {"joint": False, "polymesh": True, "nurbsSurface": True, "subdiv": True, "nurbsCurve": True, "locator": True},
+    POSE: {"joint": True, "polymesh": False, "nurbsSurface": False, "subdiv": False, "nurbsCurve": True, "locator": False},
+    EDIT: {"joint": True, "polymesh": False, "nurbsSurface": False, "subdiv": False, "nurbsCurve": False, "locator": False},
+}
+FORBIDDEN_MESSAGES = {
+    OBJECT: "Object Mode: joints are posed in Pose Mode and edited in Edit Mode (Ctrl+Tab)",
+    POSE: "Pose Mode: only joints and controls can be selected",
+    EDIT: "Edit Mode: only the rig's joints can be selected",
+}
 
 _session = None
 _mode = OBJECT
@@ -111,14 +122,46 @@ def set_mode(mode):
     """Object or pose mode (edit mode goes through enter_edit)."""
     global _mode
     _mode = mode
-    posing = mode == POSE
-    _set_child_highlight(HIGHLIGHT_SELECTED_ONLY if posing else _user_child_highlight())
-    for kind in POSE_MASKED_TYPES:
+    _set_child_highlight(HIGHLIGHT_SELECTED_ONLY if mode == POSE else _user_child_highlight())
+    _apply_selection_rules()
+
+
+def _apply_selection_rules():
+    """Viewport selection masks for the current mode, then drop anything the mode forbids."""
+    for kind, allowed in SELECTION_MASKS[current_mode()].items():
         try:
-            cmds.selectType(**{kind: not posing})
+            cmds.selectType(**{kind: allowed})
         except (RuntimeError, TypeError):
-            pass
+            pass  # not available in batch mode
+    _enforce_selection()
     _refresh_indicator()
+
+
+def _allowed(node, mode):
+    if mode == OBJECT:
+        return not cmds.ls(node, type="joint")
+    if "." in node:
+        return False  # components belong to mesh editing, in object mode
+    if mode == EDIT:
+        return bool(_session) and cmds.ls(node, long=True)[0] in _session.joint_set
+    # Pose mode: joints, and controls (transforms with curve shapes).
+    return bool(cmds.ls(node, type="joint")) or bool(cmds.listRelatives(node, shapes=True, type="nurbsCurve"))
+
+
+def _enforce_selection():
+    """Remove what the current mode forbids from the selection, whichever editor it came from."""
+    selection = cmds.ls(selection=True, long=True) or []
+    mode = current_mode()
+    kept = [s for s in selection if _allowed(s, mode)]
+    if len(kept) == len(selection):
+        return
+    # The correction itself shouldn't cost an extra Ctrl+Z.
+    cmds.undoInfo(stateWithoutFlush=False)
+    try:
+        cmds.select(kept, replace=True) if kept else cmds.select(clear=True)
+    finally:
+        cmds.undoInfo(stateWithoutFlush=True)
+    cmds.headsUpMessage(FORBIDDEN_MESSAGES[mode], time=2.0)
 
 
 def _user_child_highlight():
@@ -137,7 +180,8 @@ def _set_child_highlight(value):
 
 
 def install():
-    """Start in object mode."""
+    """Start in object mode and keep every selection within the current mode's rules."""
+    cmds.scriptJob(event=["SelectionChanged", _enforce_selection])
     set_mode(OBJECT)
 
 
@@ -151,7 +195,7 @@ def enter_edit(joints):
     finally:
         cmds.undoInfo(closeChunk=True)
     _set_child_highlight(HIGHLIGHT_SELECTED_ONLY)
-    _refresh_indicator()
+    _apply_selection_rules()
 
 
 def exit_edit():
@@ -184,6 +228,7 @@ class EditSession(object):
 
     def __init__(self, joints):
         self.joints = joints
+        self.joint_set = set(cmds.ls(joints, long=True))
         self.pose = {j: cmds.xform(j, query=True, objectSpace=True, matrix=True) for j in joints}
         self._ensure_rest()
         rest.restore(joints)
