@@ -2,7 +2,8 @@
 
 Each mode only lets you select what Blender's does, from the viewport and from any other
 editor (the selection is checked after every change):
-- Object mode (default): everything but joints, for working on the scene.
+- Object mode (default): everything but joints and rig controls, for working on the scene;
+  clicking either selects the armature, as clicking a bone or its custom shape does in Blender.
 - Pose mode, for animating: joints and controls only; only the selected joint highlights
   (not its whole hierarchy), and Alt+G/R/S return joints to their rest.
 - Edit mode, for editing the rig: the rig's joints only; joints go to their rest pose, the skin is paused so the
@@ -39,7 +40,7 @@ SELECTION_MASKS = {
     EDIT: {"joint": True, "polymesh": False, "nurbsSurface": False, "subdiv": False, "nurbsCurve": False, "locator": False},
 }
 FORBIDDEN_MESSAGES = {
-    OBJECT: "Object Mode: a joint selects its whole armature; pose bones in Pose Mode (Ctrl+Tab)",
+    OBJECT: "Object Mode: a joint or control selects its whole armature; pose bones in Pose Mode (Ctrl+Tab)",
     POSE: "Pose Mode: only this armature's joints and controls can be selected",
     EDIT: "Edit Mode: only the rig's joints can be selected",
 }
@@ -136,6 +137,16 @@ def armature(node):
     return parent[0] if parent else root
 
 
+def control_armature(node):
+    """The armature a rig control (a curve in a group holding joints) belongs to, or None for a plain curve."""
+    if not cmds.listRelatives(node, shapes=True, type="nurbsCurve"):
+        return None
+    path = cmds.ls(node, long=True)[0]
+    top = "|" + path.split("|")[1]
+    joints = cmds.listRelatives(top, allDescendents=True, type="joint", fullPath=True)
+    return armature(joints[-1]) if joints else None
+
+
 def rig_joints():
     """Joints in the selection, under the selected groups, or in the rig a selected control belongs to."""
     selection = cmds.ls(selection=True, long=True) or []
@@ -177,7 +188,7 @@ def _apply_selection_rules():
 
 def _allowed(node, mode):
     if mode == OBJECT:
-        return True   # joints are swapped for their armature in _enforce_selection
+        return True   # joints and controls are swapped for their armature in _enforce_selection
     if "." in node:
         return False  # components belong to mesh editing, in object mode
     path = cmds.ls(node, long=True)[0]
@@ -195,8 +206,12 @@ def _enforce_selection():
     mode = current_mode()
     kept, refused = [], False
     for node in selection:
-        if mode == OBJECT and cmds.ls(node, type="joint"):
-            node = armature(node)   # a bone clicked in object mode selects its armature
+        if mode == OBJECT and "." not in node:
+            # A bone, or a control standing for one, clicked in object mode selects its armature.
+            if cmds.ls(node, type="joint"):
+                node = armature(node)
+            else:
+                node = control_armature(node) or node
         if not _allowed(node, mode):
             refused = True
         elif node not in kept:

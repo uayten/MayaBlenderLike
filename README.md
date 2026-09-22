@@ -102,7 +102,7 @@ With the mouse over a viewport and something selected, G, R and S work as in Ble
 | Input | Effect |
 |---|---|
 | Move the mouse | Move in the view plane, rotate around the view axis, or scale from the pivot |
-| X / Y / Z | Lock to the global axis; press again for the local axis (of the active object), again to unlock |
+| X / Y / Z | Lock to the global axis; press again for the local axis (of the active object), again to unlock. A line through the pivot, in Maya's axis color, shows the locked axis. Switching axis discards what the previous axis did |
 | Digits, `.`, `-`, Backspace | Type an exact value: cm for move (X when no axis is locked), degrees for rotate, factor for scale |
 | G / R / S | Switch to another transform without confirming |
 | Left click / Enter | Confirm, as one undo step |
@@ -118,7 +118,7 @@ Maya has no armature modes: a joint's translate and rotate hold both its rest pl
 
 | Mode | For | What changes |
 |---|---|---|
-| **Object Mode** | Working on the scene | Maya as usual, except for bones: clicking any joint selects its **armature**, and the whole bone hierarchy highlights. The default |
+| **Object Mode** | Working on the scene | Maya as usual, except for bones: clicking any joint, or any control of its rig (a curve in the same top group), selects its **armature**, and the whole bone hierarchy highlights. Curves outside a rig select normally. The default |
 | **Pose Mode** | Animating | Only entered with an armature selected (or from its edit mode). Only that armature's joints and its rig's controls (curves) can be selected. Only the selected joint highlights, not its whole hierarchy. Alt+G / Alt+R / Alt+S return joints to rest. Stays on with nothing selected |
 | **Edit Mode** | Editing the rig | Only the joints of the rig being edited can be selected. See below |
 

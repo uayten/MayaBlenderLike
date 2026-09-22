@@ -3,6 +3,7 @@
 G / R / S over a viewport start moving, rotating or scaling the selection with the mouse:
 
     X / Y / Z        constrain to a global axis; press again for local, again to clear
+                     (a line in Maya's axis color shows the locked axis)
     digits . - Bksp  type an exact value (cm, degrees or factor)
     G / R / S        switch to another transform, keeping the selection
     click / Enter    confirm (one undo step)
@@ -34,6 +35,11 @@ AXIS_KEYS = {Qt.Key_X: 0, Qt.Key_Y: 1, Qt.Key_Z: 2}
 WORLD_AXES = (om.MVector(1, 0, 0), om.MVector(0, 1, 0), om.MVector(0, 0, 1))
 TYPED_CHARACTERS = "0123456789.-"
 MIN_SCALE = 1e-4
+# Axis line: Maya's X/Y/Z axis display colors, with its defaults when they can't be read.
+AXIS_COLOR_NAMES = ("Xaxis", "Yaxis", "Zaxis")
+DEFAULT_AXIS_COLORS = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+AXIS_LINE_LENGTH = 100000.0
+AXIS_LINE_WIDTH = 2.0
 
 
 def _key(value):
@@ -62,6 +68,7 @@ class ModalTransform(object):
         self.local = False
         self.typed = ""
         self.applied = None        # value currently applied to the scene, reverted on cancel or change
+        self.axis_line = None      # temporary curve showing the locked axis
         cmds.undoInfo(stateWithoutFlush=False)
         self._start(mode)
 
@@ -111,6 +118,8 @@ class ModalTransform(object):
             self._update()
 
     def _cycle_axis(self, axis):
+        # Revert while the old axis is still set: undoing a Z rotation around X would add to it instead.
+        self._revert()
         # Blender: first press global axis, second press local axis, third press free.
         if self.axis != axis:
             self.axis, self.local = axis, False
@@ -118,7 +127,7 @@ class ModalTransform(object):
             self.local = True
         else:
             self.axis, self.local = None, False
-        self._revert()
+        self._draw_axis_line()
         self._update()
 
     # --- transform ---
@@ -201,6 +210,7 @@ class ModalTransform(object):
         self.finished = True
         value = self.applied
         self._revert()
+        self._delete_axis_line()
         cmds.undoInfo(stateWithoutFlush=True)
         cmds.headsUpMessage("", time=0.01)
         if confirm and value is not None:
@@ -210,6 +220,32 @@ class ModalTransform(object):
                 self._apply(value)
             finally:
                 cmds.undoInfo(closeChunk=True)
+
+    # --- axis line ---
+
+    def _draw_axis_line(self):
+        """Blender's constraint line: through the pivot, along the locked axis, in Maya's axis color."""
+        self._delete_axis_line()
+        direction = self._axis_vector()
+        if direction is None:
+            return
+        center = om.MVector(self.pivot)
+        ends = [om.MPoint(center + direction * (sign * AXIS_LINE_LENGTH)) for sign in (-1, 1)]
+        # Built through the API so it doesn't touch the selection (and the mode's selection rules).
+        transform = om.MFnNurbsCurve().create(ends, [0.0, 1.0], 1, om.MFnNurbsCurve.kOpen, False, False)
+        self.axis_line = om.MFnDagNode(transform).fullPathName()
+        shape = cmds.listRelatives(self.axis_line, shapes=True, fullPath=True)[0]
+        cmds.setAttr(shape + ".overrideEnabled", True)
+        cmds.setAttr(shape + ".overrideRGBColors", True)
+        cmds.setAttr(shape + ".overrideColorRGB", *_axis_color(self.axis))
+        cmds.setAttr(shape + ".lineWidth", AXIS_LINE_WIDTH)
+        cmds.setAttr(shape + ".alwaysDrawOnTop", True)
+        cmds.setAttr(self.axis_line + ".hiddenInOutliner", True)
+
+    def _delete_axis_line(self):
+        if self.axis_line and cmds.objExists(self.axis_line):
+            cmds.delete(self.axis_line)
+        self.axis_line = None
 
     # --- geometry helpers ---
 
@@ -266,6 +302,15 @@ class ModalTransform(object):
         else:
             text = "Scale: {:.4f}".format(value)
         return text + axis + typed + "    (click/Enter confirm, right/Esc cancel, X Y Z axis)"
+
+
+def _axis_color(axis):
+    """RGB of Maya's display color for an axis (Windows > Settings/Preferences > Color Settings)."""
+    try:
+        rgb = cmds.colorIndex(cmds.displayColor(AXIS_COLOR_NAMES[axis], query=True, dormant=True), query=True)
+    except (RuntimeError, TypeError):
+        rgb = None   # not available in batch mode
+    return tuple(rgb) if rgb else DEFAULT_AXIS_COLORS[axis]
 
 
 def _view_ray(view, mouse):
