@@ -346,7 +346,7 @@ class EditSession(object):
         # Controls take their joint's new rest; the others keep theirs, as Blender's child bones stay put.
         new_rest = dict(self.control_rest)
         for joint, control in self.linked.items():
-            new_rest[control] = om.MMatrix(cmds.getAttr(joint + ".worldMatrix"))
+            new_rest[control] = controls.unscaled(om.MMatrix(cmds.getAttr(joint + ".worldMatrix")))
         controls.set_rest_worlds(new_rest)
         # Reapply the pose relative to the new rest: pose = delta * rest, so new = delta * new rest.
         # A joint driven by a control gets its pose back from the control's channels instead.

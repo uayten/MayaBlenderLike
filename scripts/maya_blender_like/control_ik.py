@@ -10,7 +10,7 @@ The chain is plumbing, rebuilt whenever the settings change or edit mode moves t
 from maya import cmds
 import maya.api.OpenMaya as om
 
-from . import controls, custom_shapes, mechanisms
+from . import controls, custom_shapes, mechanisms, stack
 
 OWNER_ATTRIBUTE = "mblIkOwner"        # same message the joint IK uses, so owner_constraints finds both
 CHAIN_ATTRIBUTE = "mblIkChain"        # message: handle -> first IK joint
@@ -62,7 +62,8 @@ def add(owner, target=None, pole=None, chain_count=2):
     cmds.setAttr(handle + "." + COUNT_ATTRIBUTE, chain_count)
     # Tie the controls to the chain while it still matches them, before the target pulls it.
     for control, joint in zip(links, joints):
-        cmds.orientConstraint(joint, control, maintainOffset=True, name=control.rsplit("|", 1)[-1] + DRIVE_SUFFIX)
+        with stack.unlocked(control, ("rotate",)):
+            cmds.orientConstraint(joint, control, maintainOffset=True, name=control.rsplit("|", 1)[-1] + DRIVE_SUFFIX)
     if target:
         cmds.pointConstraint(target, handle, maintainOffset=False)
     if pole:

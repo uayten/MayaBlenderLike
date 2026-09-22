@@ -20,6 +20,7 @@ Game engines never receive constraints of any kind: bake animation when exportin
 Limit Location / Rotation / Scale use Maya's transform limits on the owner itself, and IK
 creates an ikHandle; neither takes part in the stack order.
 """
+import contextlib
 import json
 import uuid
 
@@ -169,8 +170,9 @@ def build(owner, items):
         for index, spec in enumerate(items):
             previous = _create_layer(previous, index, spec, live.get(spec["id"]))
         _hide(stack)
-        cmds.parentConstraint(previous, owner, maintainOffset=False, name=_short(owner) + "_stackParent")
-        cmds.scaleConstraint(previous, owner, maintainOffset=False, name=_short(owner) + "_stackScale")
+        with unlocked(owner):
+            cmds.parentConstraint(previous, owner, maintainOffset=False, name=_short(owner) + "_stackParent")
+            cmds.scaleConstraint(previous, owner, maintainOffset=False, name=_short(owner) + "_stackScale")
     finally:
         cmds.undoInfo(closeChunk=True)
 
@@ -313,6 +315,24 @@ def _live_values(owner):
 
 
 # --- helpers ---
+
+@contextlib.contextmanager
+def unlocked(node, channels=("translate", "rotate", "scale")):
+    """Unlock the node's channels for the block, then lock them back.
+
+    Blender's channel locks only stop the animator; constraints still move the bone. Maya refuses
+    to connect a constraint to a locked channel, but keeps a connection made before locking.
+    """
+    plugs = ["{}.{}{}".format(node, c, a) for c in channels for a in "XYZ"]
+    locked = [p for p in plugs if cmds.getAttr(p, lock=True)]
+    for plug in locked:
+        cmds.setAttr(plug, lock=False)
+    try:
+        yield
+    finally:
+        for plug in locked:
+            cmds.setAttr(plug, lock=True)
+
 
 def _local_values(node):
     return {c: list(cmds.getAttr("{}.{}".format(node, c))[0]) for c in ("translate", "rotate", "scale")}

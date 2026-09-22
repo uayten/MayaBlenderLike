@@ -114,11 +114,11 @@ def create_main_menu():
 
     # Custom shapes for every selected joint at once (the Bone & Constraints panel does one joint).
     from . import custom_shapes
-    submenu = cmds.menuItem(label="Custom Shape (selected joints)", subMenu=True, tearOff=True, parent=MENU_NAME)
+    submenu = cmds.menuItem(label="Custom Shape (selected joints / controls)", subMenu=True, tearOff=True, parent=MENU_NAME)
     for shape in custom_shapes.SHAPES:
         cmds.menuItem(label=shape, parent=submenu, sourceType="python",
                       command="import maya_blender_like.custom_shapes as c; from maya import cmds; "
-                              "c.assign(cmds.ls(selection=True, type='joint'), {!r})".format(shape))
+                              "c.assign(cmds.ls(selection=True, long=True), {!r})".format(shape))
     cmds.menuItem(divider=True, parent=submenu)
     cmds.menuItem(label="Remove", parent=submenu, sourceType="python",
                   command="import maya_blender_like.custom_shapes as c; from maya import cmds; "
@@ -134,6 +134,9 @@ def create_main_menu():
     cmds.menuItem(label="Convert to MayaBlenderLike Rig", parent=MENU_NAME, sourceType="python",
                   annotation="Controls for the bones, mechanisms apart: select the armature first",
                   command="import maya_blender_like.mechanisms as m; m.convert_selected_rig()")
+    cmds.menuItem(label="Apply Blender Rig Data (.json)...", parent=MENU_NAME, sourceType="python",
+                  annotation="Locks, collections, custom shapes and constraints exported from Blender",
+                  command="import maya_blender_like.rig_data as r; r.apply_from_dialog()")
 
 
 def apply():

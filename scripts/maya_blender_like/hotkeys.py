@@ -49,6 +49,8 @@ CUSTOM_COMMANDS = [
      "import maya_blender_like.modes as m; m.select_all()"),
     ("MBL_AddConstraint", "Add Constraint with Targets (Blender Shift+Ctrl+C)",
      "import maya_blender_like.constraints_panel as p; p.add_constraint_menu()"),
+    ("MBL_BoneCollections", "Bone collections: move to, select, show / hide (Blender M)",
+     "import maya_blender_like.bone_collections as b; b.menu()"),
 ]
 
 ALT = {"altModifier": True}
@@ -101,6 +103,8 @@ def _bindings():
         ("N", {}, "MBL_ToggleAttributeEditorNameCommand", ""),
         # Shift+Ctrl+C: Add Constraint (with Targets): the active object is the last selected, the other is the target.
         ("C", CTRL, "MBL_AddConstraintNameCommand", ""),
+        # M: bone collections (Maya selection sets).
+        ("m", {}, "MBL_BoneCollectionsNameCommand", ""),
     ]
 
 

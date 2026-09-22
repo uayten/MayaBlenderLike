@@ -6,7 +6,8 @@ pose bone. A control linked to a joint drives it through a parent + scale constr
 keeps its real values, so FBX exports still get a normal skeleton.
 
 Control hierarchy mirrors the bone hierarchy: a bone's control is parented under its parent
-bone's control.
+bone's control. Controls are never scaled at rest, even when the joints are (FBX from Blender can
+bring joints at 100x): a control's translate reads centimeters, and the link keeps the joint's scale.
 """
 from maya import cmds
 import maya.api.OpenMaya as om
@@ -53,20 +54,37 @@ def container(top):
 
 
 def create(joint, parent, name):
-    """A control at the joint's world placement, under parent, with its rest in offsetParentMatrix."""
+    """A control at the joint's world placement (without its scale), under parent, rest in offsetParentMatrix."""
     from . import custom_shapes
     control = cmds.group(empty=True, name=name, parent=parent)
     control = cmds.ls(control, long=True)[0]
     cmds.addAttr(control, longName=CONTROL_TAG, attributeType="bool", defaultValue=True)
     cmds.addAttr(control, longName=BONE_LENGTH, attributeType="double",
-                 defaultValue=custom_shapes.bone_length(joint))
+                 defaultValue=custom_shapes.bone_length(joint) * world_scale(joint))
     cmds.addAttr(control, longName=BONE_AXIS, attributeType="double3")
     for axis in "XYZ":
         cmds.addAttr(control, longName=BONE_AXIS + axis, attributeType="double", parent=BONE_AXIS)
     cmds.setAttr(control + "." + BONE_AXIS, *custom_shapes.bone_direction(joint))
-    cmds.xform(control, worldSpace=True, matrix=cmds.xform(joint, query=True, worldSpace=True, matrix=True))
+    cmds.xform(control, worldSpace=True, matrix=list(unscaled(om.MMatrix(cmds.getAttr(joint + ".worldMatrix")))))
     zero(control)
     return control
+
+
+def world_scale(node):
+    """Uniform world scale of a node (length of its Y axis)."""
+    world = om.MMatrix(cmds.getAttr(node + ".worldMatrix"))
+    return om.MVector(world.getElement(1, 0), world.getElement(1, 1), world.getElement(1, 2)).length() or 1.0
+
+
+def unscaled(matrix):
+    """The matrix with unit-length axes: same position and orientation, no scale."""
+    rows = [om.MVector(matrix.getElement(i, 0), matrix.getElement(i, 1), matrix.getElement(i, 2)).normal()
+            for i in range(3)]
+    values = []
+    for row in rows:
+        values += [row.x, row.y, row.z, 0.0]
+    values += [matrix.getElement(3, 0), matrix.getElement(3, 1), matrix.getElement(3, 2), 1.0]
+    return om.MMatrix(values)
 
 
 def zero(node):
@@ -78,14 +96,19 @@ def zero(node):
 
 
 def link(control, joint):
-    """The joint follows the control; the control remembers which joint it drives."""
+    """The joint follows the control; the control remembers which joint it drives.
+
+    Call it with the joint at rest: its world scale then is what the control's scale 1 stands for.
+    """
+    scale = world_scale(joint)
     if not cmds.attributeQuery(JOINT_LINK, node=control, exists=True):
         cmds.addAttr(control, longName=JOINT_LINK, attributeType="message")
     if linked_joint(control) != cmds.ls(joint, long=True)[0]:
         cmds.connectAttr(joint + ".message", control + "." + JOINT_LINK, force=True)
     name = joint.rsplit("|", 1)[-1]
     cmds.parentConstraint(control, joint, maintainOffset=False, name=name + LINK_SUFFIXES[0])
-    cmds.scaleConstraint(control, joint, maintainOffset=False, name=name + LINK_SUFFIXES[1])
+    constraint = cmds.scaleConstraint(control, joint, maintainOffset=False, name=name + LINK_SUFFIXES[1])[0]
+    cmds.setAttr(constraint + ".offset", scale, scale, scale)
 
 
 def unlink(joint):

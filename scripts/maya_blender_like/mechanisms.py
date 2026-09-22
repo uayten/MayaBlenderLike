@@ -177,8 +177,12 @@ def _give_shape(joint, control):
     if not existing:
         custom_shapes.build(control, "Bone")
         return
+    scale = controls.world_scale(joint)
     for curve_shape in existing:
-        cmds.parent(curve_shape, control, relative=True, shape=True)   # same space: control sits on the joint
+        # Same place and axes as the joint, but the control is unscaled: bring the points to its units.
+        moved = cmds.parent(curve_shape, control, relative=True, shape=True)[0]
+        for index, point in enumerate(cmds.getAttr(moved + ".cv[*]")):
+            cmds.setAttr("{}.cv[{}]".format(moved, index), *[v * scale for v in point])
     cmds.setAttr(joint + ".drawStyle", 0)
 
 

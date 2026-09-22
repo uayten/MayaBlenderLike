@@ -115,6 +115,25 @@ def remove(nodes):
         cmds.undoInfo(closeChunk=True)
 
 
+def assign_curves(owner, curves, rgb=None):
+    """Custom shape from polylines already in the owner's space (a shape brought from Blender)."""
+    _clear_shapes(owner)
+    created = []
+    for points in curves:
+        curve = cmds.curve(degree=1, point=points)
+        created.extend(cmds.parent(cmds.listRelatives(curve, shapes=True, fullPath=True)[0], owner,
+                                   relative=True, shape=True))
+        cmds.delete(curve)
+    owner_name = owner.rsplit("|", 1)[-1]
+    for index, curve_shape in enumerate(created):
+        curve_shape = cmds.rename(curve_shape, "{}_customShape{}".format(owner_name, index if index else ""))
+        tag(curve_shape, "Custom", 1.0)
+        if rgb:
+            cmds.setAttr(curve_shape + ".overrideEnabled", True)
+            cmds.setAttr(curve_shape + ".overrideRGBColors", True)
+            cmds.setAttr(curve_shape + ".overrideColorRGB", *rgb)
+
+
 def tag(curve_shape, name, size):
     cmds.addAttr(curve_shape, longName=TAG, attributeType="bool", defaultValue=True)
     cmds.addAttr(curve_shape, longName="mblShapeName", dataType="string")

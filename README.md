@@ -22,6 +22,8 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 - [Hotkeys](#hotkeys)
 - [Modal transforms](#modal-transforms)
 - [Edit mode and pose mode](#edit-mode-and-pose-mode)
+- [Blender rig data](#blender-rig-data)
+- [Bone collections](#bone-collections)
 - [Constraints panel](#constraints-panel)
 - [Custom shapes](#custom-shapes)
 - [In Front](#in-front)
@@ -79,6 +81,7 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 | Tab | Over a viewport: edit mode on a selected rig, back to object mode from edit or pose mode ([details](#edit-mode-and-pose-mode)); object / component toggle on a mesh | F8 (cleared) |
 | Ctrl+Tab | Over a viewport: mode menu (Object, Edit, Pose) | |
 | Shift+Ctrl+C | Add Constraint (with Targets) menu ([details](#constraints-panel)) | Create camera from view |
+| M | Bone collections menu: move to, select, show / hide ([details](#bone-collections)) | |
 | A | Select all: every bone of the armature in pose or edit mode, everything in object mode | Frame all (moved to Home) |
 | Alt+A | Select none | Cycle display mode |
 | Home | Frame all | |
@@ -159,6 +162,33 @@ Limitations:
 - Undoing across a mode change restores the scene but not the mode display. Press Tab to resync.
 
 An experimental alternative, keeping the rest inside the joint (`offsetParentMatrix`) so channels read 0 at rest exactly like Blender, is planned for testing. It stays out of the default because its compatibility with FBX export and other riggers still has to be verified.
+
+## Blender rig data
+
+FBX carries the skeleton and the skin, not the rig. The Blender add-on in this repository, [`blender/mayablenderlike_rig_export.py`](blender/mayablenderlike_rig_export.py), writes the rest to a JSON file, and Maya puts it on the controls of the [converted rig](#convert-to-a-mayablenderlike-rig):
+
+1. In Blender: **Edit → Preferences → Add-ons → Install from Disk**, pick the file (or open it in the Text Editor and Run Script). Select the armature, then **File → Export → MayaBlenderLike Rig Data (.json)**.
+2. In Maya: import the FBX, **Convert to MayaBlenderLike Rig**, then with the rig selected **Blender Like → Apply Blender Rig Data (.json)...**.
+
+| Blender | Maya |
+|---|---|
+| Lock location / rotation / scale | Channels locked and hidden in the Channel Box. Constraints still move them, as in Blender |
+| Rotation mode | Rotate order (XYZ Euler = xyz). Quaternion and Axis Angle stay XYZ, with a note |
+| Bone collections | Selection sets, see [Bone collections](#bone-collections); hidden collections hidden |
+| Custom shape (with its translation, rotation, scale and Scale to Bone Length) | The shape's wire as curves on the control, in the bone color |
+| Copy Location / Rotation / Scale / Transforms, Child Of, Damped Track, Track To, Locked Track, Stretch To | The same constraint in the control's [stack](#the-stack), in Blender's order, with influence, mute, axes, offset and track / lock / up axes |
+| Limit Location / Rotation / Scale | Maya transform limits on the control |
+| Inverse Kinematics | [IK on the control](#convert-to-a-mayablenderlike-rig), with target, pole and chain length |
+
+Bones are matched by name (`MCH-arm.L` in Blender is `MCH_arm_L` after FBX). Anything without a Maya match is listed as a warning in the Script Editor: other constraint types, non-World spaces, Head/Tail, pole angle, inverted axes.
+
+## Bone collections
+
+Blender's bone collections are Maya **selection sets** tagged as collections, so they also show in Maya's **Edit → Quick Select Sets** and in the Outliner, and work without this module. **M** over the viewport opens Blender's menu for the selected bones (a joint counts as its control):
+
+- **Move to** a collection (the bones leave the others), or **New Collection...**
+- **Select** a collection's bones
+- **Show / Hide** a collection
 
 ## Constraints panel
 
@@ -269,6 +299,7 @@ Limitations:
 
 - IK has no influence slider yet: the chain's controls follow the IK fully, and removing the IK returns their rotation to rest.
 - Keys on the joints from before the conversion are overridden by the controls.
+- Controls are never scaled at rest, even when the FBX brings the joints at 100x: their translate reads centimeters.
 - FBX doesn't keep the length of a bone that has children. The control takes the distance to a child lying on the bone's line, or 10 cm; adjust it with Scale in the Custom Shape card.
 - Ctrl+A → Pose as Rest Pose is refused on a converted rig; edit the rest in Edit Mode.
 
