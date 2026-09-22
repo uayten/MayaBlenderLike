@@ -65,6 +65,9 @@ class ModalTransform(object):
         self.edit_mode = modes.is_editing() and not self.components
         # World matrices of unselected children, which stay put in edit mode (see _apply).
         self.rest_children = _world_matrices(_unselected_children(self.targets)) if self.edit_mode else {}
+        # Channel values at the start: reverting restores them exactly. Applying the inverse instead
+        # drifts when locked or driven channels take only part of a rotation, a bit more every mouse move.
+        self.start_channels = {} if self.components else _channel_values(self.targets)
         self.view_forward = _camera_forward(self.view)
         self.axis = None           # 0, 1, 2 or None
         self.local = False
@@ -227,9 +230,16 @@ class ModalTransform(object):
                 _safely(cmds.move, delta.x, delta.y, delta.z, target, relative=True, worldSpace=True, **keep_children)
 
     def _revert(self):
-        if self.applied is not None:
-            self._apply(self.applied, invert=True)
-            self.applied = None
+        if self.applied is None:
+            return
+        if self.components:
+            self._apply(self.applied, invert=True)   # component moves have no locks to lose part of them
+        else:
+            for plug, value in self.start_channels.items():
+                cmds.setAttr(plug, value)
+            for child, matrix in self.rest_children.items():
+                _safely(cmds.xform, child, worldSpace=True, matrix=matrix)
+        self.applied = None
 
     def _finish(self, confirm):
         if self.finished:
@@ -405,6 +415,18 @@ def _unselected_children(targets):
     targets = set(cmds.ls(targets, long=True))
     children = cmds.listRelatives(list(targets), children=True, type="transform", fullPath=True) or []
     return [child for child in children if child not in targets]
+
+
+def _channel_values(nodes):
+    """Translate / rotate / scale values of the nodes, for the channels that can be set."""
+    values = {}
+    for node in nodes:
+        for channel in ("translate", "rotate", "scale"):
+            for axis in "XYZ":
+                plug = "{}.{}{}".format(node, channel, axis)
+                if cmds.getAttr(plug, settable=True):
+                    values[plug] = cmds.getAttr(plug)
+    return values
 
 
 def _world_matrices(nodes):
