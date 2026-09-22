@@ -170,9 +170,14 @@ def apply_viewports():
 
 
 def install():
-    """Reapply In Front to the viewports whenever a scene opens."""
-    cmds.scriptJob(event=["SceneOpened", apply_viewports])
-    apply_viewports()
+    """Reapply In Front to the viewports whenever a scene opens.
+
+    Opening a scene restores the panel settings saved in the file after the SceneOpened event,
+    which would switch Joint X-Ray back off; so the reapply waits until Maya is idle.
+    """
+    later = lambda: cmds.evalDeferred(apply_viewports, lowestPriority=True)
+    cmds.scriptJob(event=["SceneOpened", later])
+    later()
 
 
 def _root(joint):

@@ -118,14 +118,16 @@ Maya has no armature modes: a joint's translate and rotate hold both its rest pl
 
 | Mode | For | What changes |
 |---|---|---|
-| **Object Mode** | Working on the scene | Maya as usual, except that joints can't be selected, so they can't be moved or rotated here. The default |
-| **Pose Mode** | Animating | Only joints and controls (curves) can be selected. Only the selected joint highlights, not its whole hierarchy. Alt+G / Alt+R / Alt+S return joints to rest. Stays on with nothing selected |
+| **Object Mode** | Working on the scene | Maya as usual, except for bones: clicking any joint selects its **armature**, and the whole bone hierarchy highlights. The default |
+| **Pose Mode** | Animating | Only entered with an armature selected (or from its edit mode). Only that armature's joints and its rig's controls (curves) can be selected. Only the selected joint highlights, not its whole hierarchy. Alt+G / Alt+R / Alt+S return joints to rest. Stays on with nothing selected |
 | **Edit Mode** | Editing the rig | Only the joints of the rig being edited can be selected. See below |
 
 | Key (over a viewport) | Effect |
 |---|---|
 | Tab | In object mode with a rig selected (a joint, a group with joints under it, or a control of the rig), enter edit mode. In edit or pose mode, back to object mode. With a mesh selected, Maya's object / component toggle (Blender's mesh edit mode) |
 | Ctrl+Tab | Menu at the cursor to pick Object, Edit or Pose Mode; the current one is marked |
+
+**The armature.** Blender separates the armature object from the bones inside it. In Maya the armature is the group holding the skeleton (`SKEL` in a `RIG|SKEL|root` rig), or the top joint when the skeleton isn't in a group. Moving it in object mode moves the whole rig, like moving an armature object. Select it, then Tab for edit mode or Ctrl+Tab → Pose Mode.
 
 The rules hold everywhere: the viewport's selection masks stop the click, and the selection is checked after every change, so picks from the Outliner or scripts are corrected too. Anything a mode forbids is dropped from the selection with a note in the viewport, and the correction adds no undo step.
 
@@ -212,7 +214,7 @@ Blender's Armature → Viewport Display → In Front: see the rig through the me
 
 - Joints: Maya can only x-ray joints per viewport (**Joint X-Ray**), not per skeleton, so while any armature in the scene has In Front on, every viewport x-rays joints.
 - Curves: the custom shapes and controls in the rig's top group get **Always Draw On Top** each.
-- The setting is saved on the skeleton's top joint, and viewports pick it up again when the scene opens.
+- The setting is saved on the skeleton's top joint, and viewports pick it up again when the scene opens, once Maya has restored the panel settings stored in the file. With the armature selected, the Bone & Constraints panel shows an **Armature** card with the same checkbox.
 
 ## Mechanism bones
 

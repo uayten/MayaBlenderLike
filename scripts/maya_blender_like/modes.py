@@ -28,23 +28,26 @@ EDIT_COLOR = 18   # Maya color index: light blue, like Blender's edit bones
 OBJECT, POSE, EDIT = "object", "pose", "edit"
 LABELS = {OBJECT: "Object Mode", POSE: "Pose Mode", EDIT: "Edit Mode"}
 
-# selectPref -selectionChildHighlightMode: 1 highlights only the selected node, not its children.
-HIGHLIGHT_SELECTED_ONLY = 1
+# selectPref -selectionChildHighlightMode: 0 highlights the whole hierarchy under the selection
+# (a selected armature shows all its bones), 1 only the selected node.
+HIGHLIGHT_CHILDREN, HIGHLIGHT_SELECTED_ONLY = 0, 1
 # What the viewport lets you click in each mode (Maya selection masks). Other editors, like the
 # Outliner, ignore masks, so the selection is also checked after every change.
 SELECTION_MASKS = {
-    OBJECT: {"joint": False, "polymesh": True, "nurbsSurface": True, "subdiv": True, "nurbsCurve": True, "locator": True},
+    OBJECT: {"joint": True, "polymesh": True, "nurbsSurface": True, "subdiv": True, "nurbsCurve": True, "locator": True},
     POSE: {"joint": True, "polymesh": False, "nurbsSurface": False, "subdiv": False, "nurbsCurve": True, "locator": False},
     EDIT: {"joint": True, "polymesh": False, "nurbsSurface": False, "subdiv": False, "nurbsCurve": False, "locator": False},
 }
 FORBIDDEN_MESSAGES = {
-    OBJECT: "Object Mode: joints are posed in Pose Mode and edited in Edit Mode (Ctrl+Tab)",
-    POSE: "Pose Mode: only joints and controls can be selected",
+    OBJECT: "Object Mode: a joint selects its whole armature; pose bones in Pose Mode (Ctrl+Tab)",
+    POSE: "Pose Mode: only this armature's joints and controls can be selected",
     EDIT: "Edit Mode: only the rig's joints can be selected",
 }
 
 _session = None
 _mode = OBJECT
+_pose_joints = set()     # the armature being posed: pose mode only selects its joints...
+_pose_rigs = set()       # ...and the controls in its rig's top group
 
 
 def is_editing():
@@ -94,8 +97,32 @@ def go(mode):
             set_mode(OBJECT)
         enter_edit(joints)
         return
+    if mode == POSE:
+        # Blender only poses an armature that is selected (or the one just edited).
+        joints = _session.joints if _session else rig_joints()
+        if not joints:
+            cmds.warning("Pose Mode: select an armature first.")
+            return
+        _set_pose_armature(joints)
     exit_edit()
     set_mode(mode)
+
+
+def _set_pose_armature(joints):
+    global _pose_joints, _pose_rigs
+    skeleton = rest.skeleton(joints)
+    _pose_joints = set(cmds.ls(skeleton, long=True))
+    _pose_rigs = {"|" + j.split("|")[1] for j in _pose_joints}
+
+
+def armature(node):
+    """Blender's armature object for a joint: the group holding its skeleton, or the top joint if there is none.
+
+    Moving it moves the whole rig, as moving an armature object does in Blender.
+    """
+    root = rest.roots([node])[0]
+    parent = cmds.listRelatives(root, parent=True, fullPath=True)
+    return parent[0] if parent else root
 
 
 def rig_joints():
@@ -122,7 +149,7 @@ def set_mode(mode):
     """Object or pose mode (edit mode goes through enter_edit)."""
     global _mode
     _mode = mode
-    _set_child_highlight(HIGHLIGHT_SELECTED_ONLY if mode == POSE else _user_child_highlight())
+    _set_child_highlight(HIGHLIGHT_SELECTED_ONLY if mode == POSE else HIGHLIGHT_CHILDREN)
     _apply_selection_rules()
 
 
@@ -139,21 +166,31 @@ def _apply_selection_rules():
 
 def _allowed(node, mode):
     if mode == OBJECT:
-        return not cmds.ls(node, type="joint")
+        return True   # joints are swapped for their armature in _enforce_selection
     if "." in node:
         return False  # components belong to mesh editing, in object mode
+    path = cmds.ls(node, long=True)[0]
     if mode == EDIT:
-        return bool(_session) and cmds.ls(node, long=True)[0] in _session.joint_set
-    # Pose mode: joints, and controls (transforms with curve shapes).
-    return bool(cmds.ls(node, type="joint")) or bool(cmds.listRelatives(node, shapes=True, type="nurbsCurve"))
+        return bool(_session) and path in _session.joint_set
+    # Pose mode: this armature's joints, and the controls (curve transforms) of its rig.
+    if cmds.ls(node, type="joint"):
+        return path in _pose_joints
+    return bool(cmds.listRelatives(node, shapes=True, type="nurbsCurve")) and         any(path.startswith(rig + "|") or path == rig for rig in _pose_rigs)
 
 
 def _enforce_selection():
-    """Remove what the current mode forbids from the selection, whichever editor it came from."""
+    """Fit the selection to the current mode's rules, whichever editor it came from."""
     selection = cmds.ls(selection=True, long=True) or []
     mode = current_mode()
-    kept = [s for s in selection if _allowed(s, mode)]
-    if len(kept) == len(selection):
+    kept, refused = [], False
+    for node in selection:
+        if mode == OBJECT and cmds.ls(node, type="joint"):
+            node = armature(node)   # a bone clicked in object mode selects its armature
+        if not _allowed(node, mode):
+            refused = True
+        elif node not in kept:
+            kept.append(node)
+    if kept == selection:
         return
     # The correction itself shouldn't cost an extra Ctrl+Z.
     cmds.undoInfo(stateWithoutFlush=False)
@@ -161,15 +198,8 @@ def _enforce_selection():
         cmds.select(kept, replace=True) if kept else cmds.select(clear=True)
     finally:
         cmds.undoInfo(stateWithoutFlush=True)
-    cmds.headsUpMessage(FORBIDDEN_MESSAGES[mode], time=2.0)
-
-
-def _user_child_highlight():
-    # Object mode shows the user's own preference (Preferences > Selection).
-    try:
-        return cmds.optionVar(query="selectionChildHighlightMode")
-    except RuntimeError:
-        return 0
+    if refused:
+        cmds.headsUpMessage(FORBIDDEN_MESSAGES[mode], time=2.0)
 
 
 def _set_child_highlight(value):

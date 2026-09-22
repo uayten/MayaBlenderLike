@@ -195,6 +195,9 @@ class ConstraintsPanel(QtWidgets.QWidget):
             return
         self.owner_label.setText(owner.rsplit("|", 1)[-1])
         cards = [CustomShapeCard(self, owner)] if cmds.nodeType(owner) == "joint" else []
+        armature_joints = cmds.listRelatives(owner, allDescendents=True, type="joint", fullPath=True) or []
+        if cmds.nodeType(owner) != "joint" and armature_joints:
+            cards.append(ArmatureCard(self, owner, armature_joints))
         cards += [StackCard(self, owner, spec) for spec in stack.specs(owner)]
         cards += [LimitCard(self, owner, kind) for kind in owner_constraints.LIMIT_CHANNELS
                   if owner_constraints.has_limits(owner, kind)]
@@ -360,6 +363,17 @@ class LimitCard(Card):
         use_min, minimum, use_max, maximum = (widgets[0].isChecked(), widgets[1].value(),
                                               widgets[2].isChecked(), widgets[3].value())
         _guarded(lambda: owner_constraints.set_limit(self.owner, self.kind, index, use_min, minimum, use_max, maximum))
+
+
+class ArmatureCard(Card):
+    """Blender's Armature > Viewport Display, for the armature (the group holding a skeleton)."""
+
+    def __init__(self, panel, owner, joints):
+        super(ArmatureCard, self).__init__(panel, owner, "Armature  ({} joints)".format(len(joints)))
+        in_front = QtWidgets.QCheckBox("In Front (see the armature through meshes)")
+        in_front.setChecked(custom_shapes.in_front(joints[0]))
+        in_front.toggled.connect(lambda checked: self.panel.run(lambda: custom_shapes.set_in_front(joints, checked)))
+        self.body.addRow("", in_front)
 
 
 class CustomShapeCard(Card):
