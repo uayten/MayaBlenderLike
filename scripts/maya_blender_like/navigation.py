@@ -13,6 +13,7 @@ Numpad keys over a viewport work like Blender's:
     1 / 3 / 7         -> front / right / top, orthographic
     Ctrl + 1 / 3 / 7  -> back / left / bottom, orthographic
     5                 -> toggle orthographic / perspective
+    . (numpad or row) -> frame selected
 
 Maya's hotkeys can't tell the numpad from the number row, so the numpad is
 handled here and the number row keeps its Maya hotkeys.
@@ -22,7 +23,7 @@ Mouse wheel zoom is Maya's own and also unchanged.
 """
 import math
 
-from maya import cmds
+from maya import cmds, mel
 
 try:
     from PySide6 import QtCore, QtWidgets
@@ -42,6 +43,7 @@ def _key_value(key):
 
 
 KEY_1, KEY_3, KEY_5, KEY_7 = (_key_value(k) for k in (Qt.Key_1, Qt.Key_3, Qt.Key_5, Qt.Key_7))
+KEY_PERIOD = _key_value(Qt.Key_Period)
 
 # With Num Lock off the numpad sends navigation keys instead of digits.
 NUMLOCK_OFF_KEYS = {
@@ -49,6 +51,7 @@ NUMLOCK_OFF_KEYS = {
     _key_value(Qt.Key_PageDown): KEY_3,
     _key_value(Qt.Key_Clear): KEY_5,
     _key_value(Qt.Key_Home): KEY_7,
+    _key_value(Qt.Key_Delete): KEY_PERIOD,
 }
 
 # World rotation (degrees) that points the camera, which looks down its local -Z, at each view.
@@ -134,13 +137,16 @@ class BlenderNavigationFilter(QtCore.QObject):
         return False
 
     def _handle_numpad(self, event, event_type):
-        if not event.modifiers() & Qt.KeypadModifier:
-            return False
         key = _key_value(event.key())
-        key = NUMLOCK_OFF_KEYS.get(key, key)
-        if key not in (KEY_1, KEY_3, KEY_5, KEY_7):
+        if event.modifiers() & Qt.KeypadModifier:
+            key = NUMLOCK_OFF_KEYS.get(key, key)
+            if key not in (KEY_1, KEY_3, KEY_5, KEY_7, KEY_PERIOD):
+                return False
+        elif key != KEY_PERIOD:
+            # The number row keeps its Maya hotkeys; only "." is shared with the numpad.
             return False
-        camera = _numpad_camera()
+        panel = _numpad_panel()
+        camera = _panel_camera(panel) if panel else None
         if camera is None:
             return False
 
@@ -150,7 +156,9 @@ class BlenderNavigationFilter(QtCore.QObject):
             return True
         if event_type == QtCore.QEvent.KeyPress and not event.isAutoRepeat():
             opposite = bool(event.modifiers() & Qt.ControlModifier)
-            if key == KEY_5:
+            if key == KEY_PERIOD:
+                _without_undo(lambda: frame_selected(panel))
+            elif key == KEY_5:
                 _without_undo(lambda: toggle_orthographic(camera))
             else:
                 _without_undo(lambda: set_view(camera, VIEW_ROTATIONS[(key, opposite)]))
@@ -200,6 +208,12 @@ def set_view(camera, rotation):
     if config.NUMPAD_AUTO_PERSPECTIVE and not cmds.getAttr(camera + ".orthographic"):
         set_orthographic(camera, True)
         _auto_orthographic.add(camera)
+
+
+def frame_selected(panel):
+    """Frame the selection in the given viewport, the same way Maya's F does."""
+    cmds.setFocus(panel)
+    mel.eval("fitPanel -selectedNoChildren")
 
 
 def toggle_orthographic(camera):
@@ -297,13 +311,13 @@ def _viewport_panel(obj):
     return None
 
 
-def _numpad_camera():
-    """Camera of the viewport under the mouse (or with focus), unless the user is typing in a field."""
+def _numpad_panel():
+    """Viewport under the mouse (or with focus), unless the user is typing in a field."""
     if isinstance(QtWidgets.QApplication.focusWidget(), TEXT_INPUT_WIDGETS):
         return None
     for panel in (cmds.getPanel(underPointer=True), cmds.getPanel(withFocus=True)):
         if panel and cmds.getPanel(typeOf=panel) == "modelPanel":
-            return _panel_camera(panel)
+            return panel
     return None
 
 

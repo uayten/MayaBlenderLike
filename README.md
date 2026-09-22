@@ -3,7 +3,7 @@
 Makes Autodesk Maya feel like Blender, installed in one step and restored in one step after reinstalling Maya:
 
 - **Viewport navigation without Alt**: middle mouse orbits, Shift + middle pans, Ctrl + middle dollies
-- **Numpad views**: 1 / 3 / 7 for front, right and top in orthographic, Ctrl for the opposite side, 5 to toggle orthographic and perspective
+- **Numpad views**: 1 / 3 / 7 for front, right and top in orthographic, Ctrl for the opposite side, 5 to toggle orthographic and perspective, `.` to frame the selection
 - **Blender hotkeys**: G / R / S to move, rotate, scale, Tab for components, A to select all, Shift+D to duplicate, Ctrl+P to parent, and more
 - **A usable grid**: 10 m wide with 1 m major lines, instead of Maya's 24 cm default
 - **Nothing hard-coded into Maya**: everything lives in this folder as a Maya module and can be switched off in one file
@@ -88,6 +88,7 @@ Press the keys with the mouse over a viewport, as in Blender.
 | Numpad 7 | Top |
 | Ctrl + Numpad 7 | Bottom |
 | Numpad 5 | Toggle orthographic / perspective, keeping the framing |
+| `.` (numpad or main keyboard) | Frame selected, same as Maya's F |
 
 Like Blender's Auto Perspective, a view that went orthographic through 1, 3 or 7 returns to perspective when you orbit. A view made orthographic with 5 stays orthographic while orbiting.
 
