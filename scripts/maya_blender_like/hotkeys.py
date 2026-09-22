@@ -1,11 +1,21 @@
 """Blender-style hotkey set, built on top of Maya_Default.
 
-Command names come from Maya 2026's scripts/startup/hotkeySetup.mel.
+Maya command names come from Maya 2026's scripts/startup/hotkeySetup.mel.
 An uppercase key means Shift + that key.
 """
 from maya import cmds
 
 from . import config
+
+# Commands this module adds to Maya: (name command, annotation, Python code).
+CUSTOM_COMMANDS = [
+    ("MBL_ClearTranslateNameCommand", "Clear location (Blender Alt+G)",
+     "import maya_blender_like.transforms as t; t.clear('translate')"),
+    ("MBL_ClearRotateNameCommand", "Clear rotation (Blender Alt+R)",
+     "import maya_blender_like.transforms as t; t.clear('rotate')"),
+    ("MBL_ClearScaleNameCommand", "Clear scale (Blender Alt+S)",
+     "import maya_blender_like.transforms as t; t.clear('scale')"),
+]
 
 # (key, modifiers, press command, release command)
 BINDINGS = [
@@ -13,6 +23,10 @@ BINDINGS = [
     ("g", {}, "TranslateToolWithSnapMarkingMenuNameCommand", "TranslateToolWithSnapMarkingMenuPopDownNameCommand"),
     ("r", {}, "RotateToolWithSnapMarkingMenuNameCommand", "RotateToolWithSnapMarkingMenuPopDownNameCommand"),
     ("s", {}, "ScaleToolWithSnapMarkingMenuNameCommand", "ScaleToolWithSnapMarkingMenuPopDownNameCommand"),
+    # Alt+G / Alt+R / Alt+S clear location, rotation, scale.
+    ("g", {"altModifier": True}, "MBL_ClearTranslateNameCommand", ""),
+    ("r", {"altModifier": True}, "MBL_ClearRotateNameCommand", ""),
+    ("s", {"altModifier": True}, "MBL_ClearScaleNameCommand", ""),
     # Set Key moves from S to I; Repeat Last moves from G to Shift+R.
     ("i", {}, "NameComSet_Keyframe", ""),
     ("R", {}, "NameComRepeat_Last_Menu_Action", ""),
@@ -35,6 +49,9 @@ def apply():
         cmds.hotkeySet(name, edit=True, current=True)
     else:
         cmds.hotkeySet(name, source="Maya_Default", current=True)
+
+    for command, annotation, code in CUSTOM_COMMANDS:
+        cmds.nameCommand(command, annotation=annotation, command=code, sourceType="python")
 
     for key, modifiers, press, release in BINDINGS:
         cmds.hotkey(keyShortcut=key, name=press, releaseName=release, **modifiers)

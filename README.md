@@ -4,7 +4,7 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 
 - **Viewport navigation without Alt**: middle mouse orbits, Shift + middle pans, Ctrl + middle dollies
 - **Numpad views**: 1 / 3 / 7 for front, right and top in orthographic, Ctrl for the opposite side, 5 to toggle orthographic and perspective, `.` to frame the selection
-- **Blender hotkeys**: G / R / S to move, rotate, scale, Tab for components, A to select all, Shift+D to duplicate, Ctrl+P to parent, and more
+- **Blender hotkeys**: G / R / S to move, rotate, scale, Alt+G / Alt+R / Alt+S to clear them, Tab for components, A to select all, Shift+D to duplicate, Ctrl+P to parent, and more
 - **A usable grid**: 10 m wide with 1 m major lines, instead of Maya's 24 cm default
 - **Nothing hard-coded into Maya**: everything lives in this folder as a Maya module and can be switched off in one file
 
@@ -50,6 +50,7 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 | G | Move tool | Repeat last (moved to Shift+R) |
 | R | Rotate tool | Scale tool (moved to S) |
 | S | Scale tool | Set key (moved to I) |
+| Alt+G / Alt+R / Alt+S | Clear location / rotation / scale | HumanIK full body key (Alt+S) |
 | I | Set key | Insert key modifier |
 | Shift+R | Repeat last command | |
 | Tab | Toggle object / component mode (F8 still works) | |
@@ -63,6 +64,8 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 W and E keep their Maya behavior (move and rotate), so Maya tutorials still apply. F still frames the selection, and H still hides and shows.
 
 The transform tools aren't modal like Blender's: the key picks the tool and you drag the manipulator.
+
+Alt+G / Alt+R / Alt+S skip locked and driven channels and can be undone in one step. Objects and controls go to 0 (1 for scale). A joint's translate and rotate hold its rest position in Maya, so zeroing them would collapse the joint. Joints go back to their bind pose instead, like a Blender bone to rest. Joints without a bind pose (not skinned) are skipped with a warning. Put controls inside offset groups and Alt+G / Alt+R / Alt+S work on them exactly as in Blender.
 
 ## Viewport navigation
 
