@@ -312,6 +312,8 @@ To add or change a hotkey, edit the `BINDINGS` list in `scripts/maya_blender_lik
 
 ## Troubleshooting
 
+**Startup order.** Hotkeys, menus, grid and the mode label load with Maya's window. The viewport event filter (middle-mouse navigation, modal G / R / S, Tab and numpad keys) waits until Maya has nothing left to load: Bifrost, USD, Arnold and other plugins keep loading after the window appears. Until the viewport shows **MayaBlenderLike ready**, the viewport behaves like stock Maya and G / R / S pick Maya's tools. Plugins you never use can be switched off in **Windows → Settings/Preferences → Plug-in Manager** (untick **Auto load**) for a faster start.
+
 At startup the Script Editor shows one line per feature, `MayaBlenderLike: <feature> applied` or `MayaBlenderLike: <feature> failed: ...`. A failed hotkey lists each binding that didn't take; the others still work.
 
 If hotkeys don't respond, check which hotkey set is active and what each key is bound to. Paste this in the Script Editor's Python tab:
