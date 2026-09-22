@@ -64,19 +64,24 @@ def freeze_rotation(joint):
     cmds.setAttr(joint + ".jointOrient", *[math.degrees(v) for v in (combined.x, combined.y, combined.z)])
 
 
-def skeleton(joints):
-    """Every joint in the hierarchies the given joints belong to."""
-    roots = set()
+def roots(joints):
+    """Top joint of each given joint's hierarchy: the skeleton as a whole, Blender's armature."""
+    found = set()
     for joint in joints:
-        root = joint
+        root = cmds.ls(joint, long=True)[0]
         while True:
             parent = cmds.listRelatives(root, parent=True, fullPath=True, type="joint")
             if not parent:
                 break
             root = parent[0]
-        roots.add(root)
+        found.add(root)
+    return sorted(found)
+
+
+def skeleton(joints):
+    """Every joint in the hierarchies the given joints belong to."""
     result = []
-    for root in sorted(roots):
+    for root in roots(joints):
         result.append(root)
         result.extend(cmds.listRelatives(root, allDescendents=True, fullPath=True, type="joint") or [])
     return result

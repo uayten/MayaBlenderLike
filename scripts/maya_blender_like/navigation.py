@@ -44,6 +44,7 @@ def _key_value(key):
 
 KEY_1, KEY_3, KEY_5, KEY_7 = (_key_value(k) for k in (Qt.Key_1, Qt.Key_3, Qt.Key_5, Qt.Key_7))
 KEY_PERIOD = _key_value(Qt.Key_Period)
+KEY_TAB, KEY_BACKTAB = _key_value(Qt.Key_Tab), _key_value(Qt.Key_Backtab)
 
 # With Num Lock off the numpad sends navigation keys instead of digits.
 NUMLOCK_OFF_KEYS = {
@@ -93,6 +94,16 @@ class BlenderNavigationFilter(QtCore.QObject):
         self._swallow_release = False
 
     def eventFilter(self, obj, event):
+        # A Python exception escaping a Qt event filter can take Maya down; report it instead.
+        try:
+            return self._filter(obj, event)
+        except Exception as error:
+            self._modal = None
+            self._mode = None
+            cmds.warning("MayaBlenderLike navigation: {}".format(error))
+            return False
+
+    def _filter(self, obj, event):
         # The same event reaches the viewport's QWindow first and its QWidget second;
         # consuming it at the first stop keeps Maya from also seeing it.
         event_type = event.type()
@@ -110,6 +121,8 @@ class BlenderNavigationFilter(QtCore.QObject):
             return True
 
         if event_type in (QtCore.QEvent.ShortcutOverride, QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease):
+            if _key_value(event.key()) in (KEY_TAB, KEY_BACKTAB):
+                return self._handle_tab(event, event_type)
             if config.ENABLE_NUMPAD_VIEWS:
                 return self._handle_numpad(event, event_type)
             return False
@@ -156,6 +169,29 @@ class BlenderNavigationFilter(QtCore.QObject):
             return True
 
         return False
+
+    def _handle_tab(self, event, event_type):
+        """Tab / Ctrl+Tab / Shift+Tab over a viewport.
+
+        Handled here rather than as Maya hotkeys because Qt spends Tab on moving keyboard focus
+        between widgets before Maya's hotkeys see it.
+        """
+        if _numpad_panel() is None:
+            return False
+        if event_type == QtCore.QEvent.ShortcutOverride:
+            event.accept()
+            return True
+        if event_type == QtCore.QEvent.KeyPress and not event.isAutoRepeat():
+            from . import interface, modes
+            modifiers = event.modifiers()
+            # Shift+Tab arrives as Backtab.
+            if _key_value(event.key()) == KEY_BACKTAB or modifiers & Qt.ShiftModifier:
+                interface.toggle_grid_snap()
+            elif modifiers & Qt.ControlModifier:
+                modes.ctrl_tab()
+            else:
+                modes.tab()
+        return True
 
     def _handle_numpad(self, event, event_type):
         key = _key_value(event.key())

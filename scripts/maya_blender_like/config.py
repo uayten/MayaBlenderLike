@@ -21,6 +21,10 @@ ENABLE_MODAL_TRANSFORMS = True
 # Label in the viewport's top-left corner: Object Mode, Pose Mode, Edit Mode - Armature / Mesh.
 ENABLE_MODE_INDICATOR = True
 
+# Object mode (clicking a joint selects its whole skeleton) and pose mode (one joint at a time,
+# only it highlights), switched with Ctrl+Tab. Off: joints select one by one, as in stock Maya.
+ENABLE_ARMATURE_MODES = True
+
 # Viewport grid, in centimeters (Maya's default working unit).
 ENABLE_GRID = True
 GRID_HALF_SIZE_CM = 500   # grid spans -5 m to +5 m

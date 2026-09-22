@@ -78,9 +78,6 @@ def _bindings():
         # Set Key moves from S to I; Repeat Last moves from G to Shift+R.
         ("i", {}, "NameComSet_Keyframe", ""),
         ("R", {}, "NameComRepeat_Last_Menu_Action", ""),
-        # Tab: edit mode with joints selected, object/component toggle otherwise (F8 keeps working). Ctrl+Tab: pose mode.
-        ("Tab", {}, "MBL_TabNameCommand", ""),
-        ("Tab", CTRL, "MBL_CtrlTabNameCommand", ""),
         # A select all, Alt+A deselect, Home frame all.
         ("a", {}, "NameComSelect_All", ""),
         ("a", ALT, "NameComSelectNone", ""),
@@ -102,8 +99,6 @@ def _bindings():
         ("N", {}, "MBL_ToggleAttributeEditorNameCommand", ""),
         # Shift+Ctrl+C: Add Constraint (with Targets): the active object is the last selected, the other is the target.
         ("C", CTRL, "MBL_AddConstraintNameCommand", ""),
-        # Shift+Tab toggles grid snap (it was held X in Maya).
-        ("Tab", SHIFT, "MBL_ToggleGridSnapNameCommand", ""),
     ]
 
 
@@ -118,6 +113,11 @@ DUPLICATES_REMOVED = [
     ("A", CTRL, "A select all"),
     ("F8", {}, "Tab object / component"),
     ("f", {}, ". frame selected"),
+    # Tab, Ctrl+Tab and Shift+Tab are read by the viewport event filter (Qt spends Tab on focus
+    # before hotkeys see it); bindings left from older versions are cleared.
+    ("Tab", {}, "Tab over a viewport"),
+    ("Tab", CTRL, "Ctrl+Tab over a viewport"),
+    ("Tab", SHIFT, "Shift+Tab over a viewport"),
 ]
 
 

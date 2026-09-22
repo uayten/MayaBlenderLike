@@ -67,11 +67,11 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 | Alt+H | Reveal all | Hide unselected |
 | N | Toggle Channel Box (Blender's sidebar) | |
 | Shift+N | Toggle Attribute Editor (Blender's Properties) | |
-| Shift+Tab | Toggle grid snap | |
+| Shift+Tab | Toggle grid snap (over a viewport) | |
 | I | Set key | Insert key modifier |
 | Shift+R | Repeat last command | |
-| Tab | Edit mode with joints selected ([details](#edit-mode-and-pose-mode)); object / component toggle otherwise | F8 (cleared) |
-| Ctrl+Tab | Leave edit mode to pose mode | |
+| Tab | Over a viewport: edit mode with joints selected ([details](#edit-mode-and-pose-mode)); object / component toggle otherwise | F8 (cleared) |
+| Ctrl+Tab | Over a viewport: toggle object mode / pose mode; from edit mode, go to pose mode | |
 | Shift+Ctrl+C | Add Constraint (with Targets) menu ([details](#constraints-panel)) | Create camera from view |
 | A | Select all | Frame all (moved to Home) |
 | Alt+A | Select none | Cycle display mode |
@@ -111,21 +111,23 @@ A label in the top-left corner of the viewport always shows the mode, like Blend
 
 | Label | When |
 |---|---|
-| Object Mode | Objects or nothing selected |
-| Pose Mode | Joints selected: animate them, Alt+G / Alt+R / Alt+S return to rest |
+| Object Mode | Default. Clicking a joint selects its whole skeleton (the top joint), like an armature, and the whole hierarchy highlights |
+| Pose Mode | Joints select one at a time and only the selected one highlights; animate them, Alt+G / Alt+R / Alt+S return to rest. Stays on with nothing selected |
 | Edit Mode - Armature | After Tab on joints: editing the rest |
 | Edit Mode - Mesh | Maya's component mode (Tab on a mesh): vertices, edges, faces |
 
-Object and pose mode aren't separate states in Maya: the label follows the selection. The label shows while the viewport's Heads Up Display is on (**Display → Heads Up Display**).
+**Ctrl+Tab** toggles object and pose mode, as in Blender. Leaving edit mode returns to the mode you entered it from. Tab, Ctrl+Tab and Shift+Tab act over a viewport: Qt uses Tab to move keyboard focus between widgets before Maya's hotkeys see it, so the module reads these keys in its viewport event filter. Set `ENABLE_ARMATURE_MODES = False` to keep Maya's one-joint-at-a-time selection everywhere.
+
+The label shows while the viewport's Heads Up Display is on (**Display → Heads Up Display**).
 
 **Edit mode** (Tab with joints selected, for their whole skeleton):
 
-- Joints go to their rest pose and are drawn light blue; the viewport shows **EDIT MODE**.
+- Joints go to their rest pose and are drawn light blue; the label shows **Edit Mode - Armature**.
 - The skin is paused, so the mesh stays still while you move joints, like Blender's edit bones.
 - Moving, rotating or scaling a joint leaves its children in place, with the modal G / R / S and with Maya's own tools.
 - E extrudes new joints.
 
-**Leaving edit mode** (Tab again, or Ctrl+Tab):
+**Leaving edit mode** (Tab again, or Ctrl+Tab to land in pose mode):
 
 - The new placement becomes the rest. Rotation goes into jointOrient, so joints at rest read rotate 0, as Maya riggers expect.
 - The skin is rebound at the new rest: the mesh keeps its shape instead of jumping.
@@ -248,6 +250,7 @@ NUMPAD_AUTO_PERSPECTIVE = True
 
 ENABLE_MODAL_TRANSFORMS = True
 ENABLE_MODE_INDICATOR = True
+ENABLE_ARMATURE_MODES = True
 ENABLE_LAYOUT = True
 ENABLE_COLORS = True
 
