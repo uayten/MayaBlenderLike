@@ -368,7 +368,11 @@ class CustomShapeCard(Card):
     NONE, FROM_CURVE = "None", "From Selected Curve..."
 
     def __init__(self, panel, owner):
-        super(CustomShapeCard, self).__init__(panel, owner, "Custom Shape  (bone display)")
+        super(CustomShapeCard, self).__init__(panel, owner, "Viewport Display")
+        in_front = QtWidgets.QCheckBox("In Front (whole armature: see it through meshes)")
+        in_front.setChecked(custom_shapes.in_front(owner))
+        in_front.toggled.connect(lambda checked: self.panel.run(lambda: custom_shapes.set_in_front([owner], checked)))
+        self.body.addRow("", in_front)
         current = custom_shapes.settings(owner) or {"shape": self.NONE, "size": 1.0,
                                                     "color": custom_shapes.COLORS["Yellow"], "hide_bone": True}
         self.shape = QtWidgets.QComboBox()
@@ -388,7 +392,7 @@ class CustomShapeCard(Card):
         self.hide_bone = QtWidgets.QCheckBox("Hide bone (wireframe shape only)")
         self.hide_bone.setChecked(current["hide_bone"])
 
-        self.body.addRow("Shape", self.shape)
+        self.body.addRow("Custom Shape", self.shape)
         self.body.addRow("Scale", self.size)
         self.body.addRow("Color", self.color)
         self.body.addRow("", self.hide_bone)

@@ -6,6 +6,7 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 - **Numpad views**: 1 / 3 / 7 for front, right and top in orthographic, Ctrl for the opposite side, 5 to toggle orthographic and perspective, `.` to frame the selection
 - **Edit mode and pose mode for skeletons**: Tab on joints edits the rest with the mesh standing still, then rebinds the skin; Alt+G / Alt+R / Alt+S return to that rest
 - **Custom shapes for joints**: circle, square, cube, sphere, diamond, arrow or any curve of yours, scaled by bone length, bone hidden; plain Maya data that works for anyone who opens the file
+- **Armature In Front and mechanism bones**: see the rig through meshes; turn Blender's non-deforming helper bones into Maya locators or groups
 - **Constraints panel with Blender's stack**: Blender constraint names, top-to-bottom order, influence, Apply, built from standard Maya nodes
 - **Modal transforms**: G / R / S follow the mouse, X / Y / Z lock an axis, type a value, click to confirm, right-click to cancel; E extrudes joints like bones
 - **Blender hotkeys and menus**: Shift+A add, Ctrl+A apply, X delete, H / Shift+H / Alt+H hide and reveal, Alt+G / Alt+R / Alt+S clear transforms, Tab for components, A to select all, Shift+D to duplicate, Ctrl+P to parent, N for the sidebar, and more
@@ -22,6 +23,8 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 - [Edit mode and pose mode](#edit-mode-and-pose-mode)
 - [Constraints panel](#constraints-panel)
 - [Custom shapes](#custom-shapes)
+- [In Front](#in-front)
+- [Mechanism bones](#mechanism-bones)
 - [Viewport navigation](#viewport-navigation)
 - [Numpad views](#numpad-views)
 - [Layout and colors](#layout-and-colors)
@@ -200,6 +203,30 @@ Blender's Bone → Viewport Display → Custom Shape, for Maya joints.
 **Working for anyone who opens the file.** The shape is a curve parented under the joint itself, Maya's native technique. The scene needs nothing but Maya: tested by saving the file and reopening it without this module, the shapes are there and the file only requires Maya.
 
 **FBX.** Tested: FBX export writes the joints as plain bones and leaves the curves out, so game engines get a clean skeleton.
+
+## In Front
+
+Blender's Armature → Viewport Display → In Front: see the rig through the mesh. Tick **In Front** in the Viewport Display card of the Bone & Constraints panel, or use **Blender Like → Armature In Front: On / Off** with the rig selected.
+
+- Joints: Maya can only x-ray joints per viewport (**Joint X-Ray**), not per skeleton, so while any armature in the scene has In Front on, every viewport x-rays joints.
+- Curves: the custom shapes and controls in the rig's top group get **Always Draw On Top** each.
+- The setting is saved on the skeleton's top joint, and viewports pick it up again when the scene opens.
+
+## Mechanism bones
+
+Blender rigs use non-deforming bones as pivots, targets and helpers. Maya rigs use **locators** (a visible point, good as a constraint target or pivot) or **groups** (an invisible transform, good as an offset). **Blender Like → Mechanism Bones**:
+
+1. **Select Non-Deforming Joints of the Rig**: with the rig (or any part of it) selected, selects the joints that deform no mesh.
+2. **Convert Selected to Locators** or **Convert Selected to Groups**.
+
+Each converted joint becomes a locator or group:
+
+- with the same name, world position and orientation,
+- inside a **MECH** group beside the skeleton (`RIG|MECH`), so the skeleton keeps only deforming joints,
+- still following the bone it hung from (parent and scale constraints with offset), with non-deforming children kept under it,
+- with constraints that used the joint as a target reconnected to it.
+
+Left as joints, and listed in a warning: joints that deform the mesh, joints with deforming joints below them (removing them would cut the skeleton), and joints driven by a constraint. The conversion is one undo step.
 
 ## Viewport navigation
 

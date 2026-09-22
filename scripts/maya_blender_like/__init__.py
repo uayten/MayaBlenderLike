@@ -20,6 +20,7 @@ def startup():
     _run("menu", lambda: _import("interface").create_main_menu())
     if config.ENABLE_MODE_INDICATOR:
         _run("mode indicator", lambda: _import("modes").install_indicator())
+    _run("armature in front", lambda: _import("custom_shapes").install())
     if config.ENABLE_ARMATURE_MODES:
         _run("object / pose modes", lambda: _import("modes").install())
 

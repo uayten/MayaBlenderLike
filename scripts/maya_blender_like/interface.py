@@ -124,6 +124,23 @@ def create_main_menu():
                   command="import maya_blender_like.custom_shapes as c; from maya import cmds; "
                           "c.remove(cmds.ls(selection=True, type='joint'))")
 
+    rig = "import maya_blender_like.modes as m; joints = m.rig_joints(); "
+    cmds.menuItem(label="Armature In Front: On", parent=MENU_NAME, sourceType="python",
+                  command=rig + "import maya_blender_like.custom_shapes as c; c.set_in_front(joints, True)")
+    cmds.menuItem(label="Armature In Front: Off", parent=MENU_NAME, sourceType="python",
+                  command=rig + "import maya_blender_like.custom_shapes as c; c.set_in_front(joints, False)")
+
+    # Blender mechanism bones (non-deforming) -> Maya locators or groups.
+    mechanisms = cmds.menuItem(label="Mechanism Bones", subMenu=True, tearOff=True, parent=MENU_NAME)
+    cmds.menuItem(label="Select Non-Deforming Joints of the Rig", parent=mechanisms, sourceType="python",
+                  command="import maya_blender_like.mechanisms as m; m.select_mechanisms()")
+    cmds.menuItem(label="Convert Selected to Locators", parent=mechanisms, sourceType="python",
+                  command="import maya_blender_like.mechanisms as m; from maya import cmds; "
+                          "m.convert(cmds.ls(selection=True, type='joint'), m.LOCATOR)")
+    cmds.menuItem(label="Convert Selected to Groups", parent=mechanisms, sourceType="python",
+                  command="import maya_blender_like.mechanisms as m; from maya import cmds; "
+                          "m.convert(cmds.ls(selection=True, type='joint'), m.GROUP)")
+
 
 def apply():
     if config.ENABLE_LAYOUT:

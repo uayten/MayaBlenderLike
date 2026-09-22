@@ -124,6 +124,62 @@ def _build(joint, shape, size, source):
     return [cmds.rename(s, "{}_customShape{}".format(joint_name, i if i else "")) for i, s in enumerate(created)]
 
 
+# --- In Front (Blender: Armature > Viewport Display > In Front) ---
+
+IN_FRONT_ATTRIBUTE = "mblInFront"
+
+
+def in_front(joint):
+    root = _root(joint)
+    return bool(cmds.attributeQuery(IN_FRONT_ATTRIBUTE, node=root, exists=True)
+                and cmds.getAttr(root + "." + IN_FRONT_ATTRIBUTE))
+
+
+def set_in_front(joints, enabled):
+    """Draw the armature through meshes: joints x-rayed in the viewports, its curves always on top.
+
+    Maya can't x-ray joints one skeleton at a time, only per viewport (Joint X-Ray), so the joints of
+    every skeleton show through while any armature has In Front on. Curves (custom shapes and the
+    controls in the rig's group) get Always Draw On Top each. The setting is saved in the scene.
+    """
+    cmds.undoInfo(openChunk=True, chunkName="in_front")
+    try:
+        from . import rest
+        for root in rest.roots(cmds.ls(joints, type="joint", long=True)):
+            if not cmds.attributeQuery(IN_FRONT_ATTRIBUTE, node=root, exists=True):
+                cmds.addAttr(root, longName=IN_FRONT_ATTRIBUTE, attributeType="bool")
+            cmds.setAttr(root + "." + IN_FRONT_ATTRIBUTE, enabled)
+            top = "|" + root.split("|")[1]
+            for curve in cmds.listRelatives(top, allDescendents=True, type="nurbsCurve", fullPath=True) or []:
+                cmds.setAttr(curve + ".alwaysDrawOnTop", enabled)
+    finally:
+        cmds.undoInfo(closeChunk=True)
+    apply_viewports()
+
+
+def apply_viewports():
+    """Joint X-Ray in every viewport while any armature in the scene has In Front on."""
+    enabled = any(cmds.getAttr(j + "." + IN_FRONT_ATTRIBUTE)
+                  for j in cmds.ls(type="joint", long=True)
+                  if cmds.attributeQuery(IN_FRONT_ATTRIBUTE, node=j, exists=True))
+    for panel in cmds.getPanel(type="modelPanel") or []:
+        try:
+            cmds.modelEditor(panel, edit=True, jointXray=enabled)
+        except RuntimeError:
+            pass
+
+
+def install():
+    """Reapply In Front to the viewports whenever a scene opens."""
+    cmds.scriptJob(event=["SceneOpened", apply_viewports])
+    apply_viewports()
+
+
+def _root(joint):
+    from . import rest
+    return rest.roots([joint])[0]
+
+
 def bone_length(joint):
     child = _first_child(joint)
     if child is None:
