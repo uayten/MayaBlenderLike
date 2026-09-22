@@ -63,6 +63,8 @@ class ModalTransform(object):
             return
         self.pivot = _pivot(self.targets, self.components)
         self.edit_mode = modes.is_editing() and not self.components
+        # World matrices of unselected children, which stay put in edit mode (see _apply).
+        self.rest_children = _world_matrices(_unselected_children(self.targets)) if self.edit_mode else {}
         self.view_forward = _camera_forward(self.view)
         self.axis = None           # 0, 1, 2 or None
         self.local = False
@@ -209,7 +211,11 @@ class ModalTransform(object):
                 return
             self._orbit("scalePivot", lambda offset: om.MVector(offset.x * scale[0], offset.y * scale[1], offset.z * scale[2]),
                         keep_children)
-            _safely(cmds.scale, scale[0], scale[1], scale[2], targets, relative=True, **keep_children)
+            # preserveChildPosition doesn't undo its own scale compensation on the inverse scale, so every
+            # revert would leave the children more scaled; put them back at their rest matrices instead.
+            _safely(cmds.scale, scale[0], scale[1], scale[2], targets, relative=True)
+            for child, matrix in self.rest_children.items():
+                _safely(cmds.xform, child, worldSpace=True, matrix=matrix)
 
     def _orbit(self, pivot_flag, transform_offset, keep_children):
         """Move each object so its own pivot lands where the transform around the shared pivot takes it."""
@@ -389,6 +395,16 @@ def _owner(target):
 
 def _distance(a, b):
     return math.hypot(a[0] - b[0], a[1] - b[1])
+
+
+def _unselected_children(targets):
+    targets = set(cmds.ls(targets, long=True))
+    children = cmds.listRelatives(list(targets), children=True, type="transform", fullPath=True) or []
+    return [child for child in children if child not in targets]
+
+
+def _world_matrices(nodes):
+    return {node: cmds.xform(node, query=True, worldSpace=True, matrix=True) for node in nodes}
 
 
 def _safely(command, *args, **kwargs):
