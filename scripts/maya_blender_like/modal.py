@@ -24,7 +24,7 @@ except ImportError:  # Maya 2024 and older ship PySide2
     from PySide2 import QtCore, QtGui, QtWidgets
     from shiboken2 import wrapInstance
 
-from . import modes
+from . import drivers, modes
 
 Qt = QtCore.Qt
 
@@ -287,6 +287,10 @@ def _selection_targets():
     if components:
         return components, True
     nodes = cmds.ls(selection=True, transforms=True, long=True) or []
+    # A joint that follows a control through a constraint can't move itself: move the control.
+    nodes, note = drivers.redirect(nodes)
+    if note:
+        cmds.headsUpMessage(note, time=2.0)
     chosen = set(nodes)
     # Blender moves a child whose parent is also selected only once; Maya would move it twice.
     top = [n for n in nodes if not any(n.startswith(other + "|") for other in chosen if other != n)]

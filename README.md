@@ -5,6 +5,7 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 - **Viewport navigation without Alt**: middle mouse orbits, Shift + middle pans, Ctrl + middle dollies
 - **Numpad views**: 1 / 3 / 7 for front, right and top in orthographic, Ctrl for the opposite side, 5 to toggle orthographic and perspective, `.` to frame the selection
 - **Edit mode and pose mode for skeletons**: Tab on joints edits the rest with the mesh standing still, then rebinds the skin; Alt+G / Alt+R / Alt+S return to that rest
+- **Custom shapes for joints**: circle, square, cube, sphere, diamond, arrow or any curve of yours, scaled by bone length, bone hidden; plain Maya data that works for anyone who opens the file
 - **Constraints panel with Blender's stack**: Blender constraint names, top-to-bottom order, influence, Apply, built from standard Maya nodes
 - **Modal transforms**: G / R / S follow the mouse, X / Y / Z lock an axis, type a value, click to confirm, right-click to cancel; E extrudes joints like bones
 - **Blender hotkeys and menus**: Shift+A add, Ctrl+A apply, X delete, H / Shift+H / Alt+H hide and reveal, Alt+G / Alt+R / Alt+S clear transforms, Tab for components, A to select all, Shift+D to duplicate, Ctrl+P to parent, N for the sidebar, and more
@@ -20,6 +21,7 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 - [Modal transforms](#modal-transforms)
 - [Edit mode and pose mode](#edit-mode-and-pose-mode)
 - [Constraints panel](#constraints-panel)
+- [Custom shapes](#custom-shapes)
 - [Viewport navigation](#viewport-navigation)
 - [Numpad views](#numpad-views)
 - [Layout and colors](#layout-and-colors)
@@ -84,7 +86,11 @@ W keeps Maya's move manipulator for when you want to drag handles. E is extrude 
 
 Maya's own keys for actions these keys already cover are cleared in this set, so each action has one key: Ctrl+D (use Shift+D), P and Shift+P (use Ctrl+P and Alt+P), Ctrl+H (use H), Alt+D (use Alt+A), Ctrl+Shift+A (use A), F8 (use Tab) and F (use `.`). Editor-specific keys, like F in the Graph Editor, stay. Shift+A adds objects at the origin, sized in centimeters like Blender's defaults in meters (a 1 m bone is 100 cm).
 
-Alt+G / Alt+R / Alt+S skip locked and driven channels and can be undone in one step. Objects and controls go to 0 (1 for scale). A joint's translate and rotate hold its rest position in Maya, so zeroing them would collapse the joint. Joints go back to their rest instead, like a Blender bone: the rest recorded by [edit mode](#edit-mode-and-pose-mode), or the skin's bind pose before the first edit. Joints with neither are skipped with a warning. Put controls inside offset groups and Alt+G / Alt+R / Alt+S work on them exactly as in Blender.
+Alt+G / Alt+R / Alt+S skip locked and driven channels and can be undone in one step. When every channel is locked or driven they say so and add nothing to the undo queue.
+
+**Joints that follow a control.** In a Maya rig a joint usually follows a control through a constraint (for example `root` constrained to `CTRL_main`), so its channels are outputs and can't be set. G / R / S and Alt+G / Alt+R / Alt+S on such a joint act on the control that drives it, and the viewport says so (`root follows CTRL_main: acting on the control`). Constraint-stack plumbing from the Bone & Constraints panel is not treated as a control.
+
+ Objects and controls go to 0 (1 for scale). A joint's translate and rotate hold its rest position in Maya, so zeroing them would collapse the joint. Joints go back to their rest instead, like a Blender bone: the rest recorded by [edit mode](#edit-mode-and-pose-mode), or the skin's bind pose before the first edit. Joints with neither are skipped with a warning. Put controls inside offset groups and Alt+G / Alt+R / Alt+S work on them exactly as in Blender.
 
 ## Modal transforms
 
@@ -118,7 +124,7 @@ Maya has no armature modes: a joint's translate and rotate hold both its rest pl
 | Tab | In object mode with a rig selected (a joint, a group with joints under it, or a control of the rig), enter edit mode. In edit or pose mode, back to object mode. With a mesh selected, Maya's object / component toggle (Blender's mesh edit mode) |
 | Ctrl+Tab | Menu at the cursor to pick Object, Edit or Pose Mode; the current one is marked |
 
-The same three modes are in the **Blender Like** menu. A label in the top-left corner of the viewport always shows the mode (Object Mode, Pose Mode, Edit Mode - Rig, Edit Mode - Mesh), while the viewport's Heads Up Display is on (**Display → Heads Up Display**).
+The same three modes are in the **Blender Like** menu. A label in the top-left corner of the viewport always shows the mode (Object Mode, Pose Mode, Edit Mode - Rig, Edit Mode - Mesh), with the active object's name under it (`Bone: root` for a joint, `Active: CTRL_main` otherwise, plus how many others are selected), while the viewport's Heads Up Display is on (**Display → Heads Up Display**).
 
 Tab, Ctrl+Tab and Shift+Tab act over a viewport: Qt uses Tab to move keyboard focus between widgets before Maya's hotkeys see it, so the module reads these keys in its viewport event filter. Set `ENABLE_ARMATURE_MODES = False` to skip pose mode's selection changes.
 
@@ -148,7 +154,7 @@ An experimental alternative, keeping the rest inside the joint (`offsetParentMat
 
 ## Constraints panel
 
-**Blender Like → Constraints Panel** docks a panel next to the Attribute Editor, like Blender's Constraints tab. It follows the active object (the last one selected).
+**Blender Like → Bone & Constraints Panel** docks a panel next to the Attribute Editor, like Blender's Bone and Constraints tabs. It follows the active object (the last one selected).
 
 - **Add Object Constraint** lists Blender's constraints by name: Copy Location, Copy Rotation, Copy Scale, Copy Transforms, Limit Location, Limit Rotation, Limit Scale, Damped Track, Inverse Kinematics, Locked Track, Stretch To, Track To, Child Of.
 - With a second object selected, it becomes the target, like Blender's Add Constraint (with Targets). Shift+Ctrl+C opens the same menu at the cursor.
@@ -181,6 +187,19 @@ Differences from Blender:
 
 - A constrained owner's channels become outputs of its stack, as with any Maya constraint. Animate a control and constrain the joint to it, which is standard Maya practice, instead of animating the constrained node directly.
 - Constraint spaces are world space. Blender's local and custom spaces aren't offered.
+
+## Custom shapes
+
+Blender's Bone → Viewport Display → Custom Shape, for Maya joints.
+
+- In the **Bone & Constraints** panel, a joint shows a **Custom Shape** card: shape (Circle, Square, Cube, Sphere, Diamond, Arrow, Line, or **From Selected Curve** to copy any curve of yours), scale, color, and **Hide bone** to show only the shape.
+- **Blender Like → Custom Shape (selected joints)** applies a shape to several joints at once, or removes it.
+- Shapes are built in bone space: Y runs along the bone, toward the first child joint, and the size follows the bone length, like Blender's Scale to Bone Length. A copied curve keeps its own size, times the scale.
+- Clicking the shape selects the joint.
+
+**Working for anyone who opens the file.** The shape is a curve parented under the joint itself, Maya's native technique. The scene needs nothing but Maya: tested by saving the file and reopening it without this module, the shapes are there and the file only requires Maya.
+
+**FBX.** Tested: FBX export writes the joints as plain bones and leaves the curves out, so game engines get a clean skeleton.
 
 ## Viewport navigation
 

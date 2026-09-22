@@ -22,6 +22,7 @@ import maya.api.OpenMaya as om
 from . import rest
 
 HUD_NAME = "MBL_ModeIndicator"
+ACTIVE_HUD_NAME = "MBL_ActiveIndicator"
 EDIT_COLOR = 18   # Maya color index: light blue, like Blender's edit bones
 OBJECT, POSE, EDIT = "object", "pose", "edit"
 LABELS = {OBJECT: "Object Mode", POSE: "Pose Mode", EDIT: "Edit Mode"}
@@ -268,21 +269,34 @@ def mode_text():
     return "Object Mode    (Tab: edit rig, Ctrl+Tab: modes)"
 
 
+def active_text():
+    """The active (last selected) object under the mode, like Blender's "Armature : Bone" line."""
+    selection = cmds.ls(selection=True) or []
+    if not selection:
+        return ""
+    active = selection[-1].rsplit("|", 1)[-1]
+    kind = "Bone" if cmds.ls(selection[-1], type="joint") else "Active"
+    extra = "   (+{} selected)".format(len(selection) - 1) if len(selection) > 1 else ""
+    return "{}: {}{}".format(kind, active, extra)
+
+
 def install_indicator():
-    """Always-on mode label in the top-left corner of every viewport."""
-    if cmds.headsUpDisplay(HUD_NAME, exists=True):
-        cmds.headsUpDisplay(HUD_NAME, remove=True)
-    block = cmds.headsUpDisplay(nextFreeBlock=0)
-    cmds.headsUpDisplay(HUD_NAME, section=0, block=block, blockSize="large", label="",
-                        labelFontSize="large", dataFontSize="large",
-                        command=mode_text, event="SelectionChanged")
+    """Always-on mode label, and the active object's name under it, in the top-left corner of every viewport."""
+    for name, command in ((HUD_NAME, mode_text), (ACTIVE_HUD_NAME, active_text)):
+        if cmds.headsUpDisplay(name, exists=True):
+            cmds.headsUpDisplay(name, remove=True)
+        block = cmds.headsUpDisplay(nextFreeBlock=0)
+        cmds.headsUpDisplay(name, section=0, block=block, blockSize="large", label="",
+                            labelFontSize="large", dataFontSize="large",
+                            command=command, event="SelectionChanged")
     # Object / component switches don't change the selection event, so refresh on them too.
     cmds.scriptJob(event=["SelectModeChanged", _refresh_indicator])
 
 
 def _refresh_indicator():
-    if cmds.headsUpDisplay(HUD_NAME, exists=True):
-        cmds.headsUpDisplay(HUD_NAME, refresh=True)
+    for name in (HUD_NAME, ACTIVE_HUD_NAME):
+        if cmds.headsUpDisplay(name, exists=True):
+            cmds.headsUpDisplay(name, refresh=True)
 
 
 def _show_hud(visible):

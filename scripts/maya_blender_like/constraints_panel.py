@@ -16,7 +16,7 @@ except ImportError:  # Maya 2024 and older ship PySide2
     from PySide2 import QtCore, QtGui, QtWidgets
     from shiboken2 import wrapInstance
 
-from . import owner_constraints, stack
+from . import custom_shapes, owner_constraints, stack
 
 WORKSPACE_NAME = "MBL_ConstraintsPanel"
 AXES = ["X", "Y", "Z", "-X", "-Y", "-Z"]
@@ -33,10 +33,10 @@ def show():
         return
     ui_script = "import maya_blender_like.constraints_panel as p; p.build_ui()"
     try:
-        cmds.workspaceControl(WORKSPACE_NAME, label="Constraints", retain=False,
+        cmds.workspaceControl(WORKSPACE_NAME, label="Bone & Constraints", retain=False,
                               tabToControl=("AttributeEditor", -1), uiScript=ui_script)
     except RuntimeError:
-        cmds.workspaceControl(WORKSPACE_NAME, label="Constraints", retain=False,
+        cmds.workspaceControl(WORKSPACE_NAME, label="Bone & Constraints", retain=False,
                               floating=True, uiScript=ui_script)
 
 
@@ -194,7 +194,8 @@ class ConstraintsPanel(QtWidgets.QWidget):
             self.owner_label.setText("Select an object or joint")
             return
         self.owner_label.setText(owner.rsplit("|", 1)[-1])
-        cards = [StackCard(self, owner, spec) for spec in stack.specs(owner)]
+        cards = [CustomShapeCard(self, owner)] if cmds.nodeType(owner) == "joint" else []
+        cards += [StackCard(self, owner, spec) for spec in stack.specs(owner)]
         cards += [LimitCard(self, owner, kind) for kind in owner_constraints.LIMIT_CHANNELS
                   if owner_constraints.has_limits(owner, kind)]
         if cmds.nodeType(owner) == "joint" and owner_constraints.ik_handle(owner):
@@ -359,6 +360,65 @@ class LimitCard(Card):
         use_min, minimum, use_max, maximum = (widgets[0].isChecked(), widgets[1].value(),
                                               widgets[2].isChecked(), widgets[3].value())
         _guarded(lambda: owner_constraints.set_limit(self.owner, self.kind, index, use_min, minimum, use_max, maximum))
+
+
+class CustomShapeCard(Card):
+    """Blender's Bone > Viewport Display > Custom Shape."""
+
+    NONE, FROM_CURVE = "None", "From Selected Curve..."
+
+    def __init__(self, panel, owner):
+        super(CustomShapeCard, self).__init__(panel, owner, "Custom Shape  (bone display)")
+        current = custom_shapes.settings(owner) or {"shape": self.NONE, "size": 1.0,
+                                                    "color": custom_shapes.COLORS["Yellow"], "hide_bone": True}
+        self.shape = QtWidgets.QComboBox()
+        self.shape.addItems([self.NONE] + list(custom_shapes.SHAPES) + [self.FROM_CURVE])
+        if current["shape"] == "Custom":
+            self.shape.insertItem(1, "Custom")
+        self.shape.setCurrentText(current["shape"])
+        self.size = QtWidgets.QDoubleSpinBox()
+        self.size.setRange(0.01, 100.0)
+        self.size.setSingleStep(0.1)
+        self.size.setValue(current["size"])
+        self.size.setToolTip("Scale, relative to the bone length (Blender's Scale to Bone Length)")
+        self.color = QtWidgets.QComboBox()
+        self.color.addItems(list(custom_shapes.COLORS))
+        names = {v: k for k, v in custom_shapes.COLORS.items()}
+        self.color.setCurrentText(names.get(current["color"], "Yellow"))
+        self.hide_bone = QtWidgets.QCheckBox("Hide bone (wireframe shape only)")
+        self.hide_bone.setChecked(current["hide_bone"])
+
+        self.body.addRow("Shape", self.shape)
+        self.body.addRow("Scale", self.size)
+        self.body.addRow("Color", self.color)
+        self.body.addRow("", self.hide_bone)
+        note = QtWidgets.QLabel("Plain Maya curves under the joint: anyone opening the file sees them, no tool needed.")
+        note.setWordWrap(True)
+        note.setStyleSheet("color: gray; font-size: 10px;")
+        self.body.addRow(note)
+
+        self.shape.currentTextChanged.connect(lambda _: self._apply())
+        self.size.editingFinished.connect(self._apply)
+        self.color.currentTextChanged.connect(lambda _: self._apply())
+        self.hide_bone.toggled.connect(lambda _: self._apply())
+
+    def _apply(self):
+        shape = self.shape.currentText()
+        owner = self.owner
+        if shape == self.NONE:
+            self.panel.run(lambda: custom_shapes.remove([owner]))
+            return
+        options = dict(size=self.size.value(), color=custom_shapes.COLORS[self.color.currentText()],
+                       hide_bone=self.hide_bone.isChecked())
+        if shape == self.FROM_CURVE:
+            self.panel.start_pick(lambda node: custom_shapes.assign([owner], source=node, **options), "curve")
+        elif shape == "Custom":
+            source_shapes = custom_shapes.shapes(owner)
+            # Recolor / re-hide a copied curve in place; its geometry stays as it was.
+            self.panel.run(lambda: [cmds.setAttr(s + ".overrideColor", options["color"]) for s in source_shapes]
+                           + [cmds.setAttr(owner + ".drawStyle", 2 if options["hide_bone"] else 0)])
+        else:
+            self.panel.run(lambda: custom_shapes.assign([owner], shape, **options))
 
 
 class IkCard(Card):

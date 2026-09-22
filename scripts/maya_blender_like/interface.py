@@ -94,7 +94,7 @@ def create_main_menu():
         cmds.deleteUI(MENU_NAME)
     cmds.menu(MENU_NAME, parent="MayaWindow", label="Blender Like", tearOff=True)
     items = [
-        ("Constraints Panel", "import maya_blender_like.constraints_panel as p; p.show()"),
+        ("Bone & Constraints Panel", "import maya_blender_like.constraints_panel as p; p.show()"),
         ("Add Constraint (with Targets)   Shift+Ctrl+C", "import maya_blender_like.constraints_panel as p; p.add_constraint_menu()"),
         None,
         ("Object Mode", "import maya_blender_like.modes as m; m.go(m.OBJECT)"),
@@ -111,6 +111,18 @@ def create_main_menu():
             cmds.menuItem(divider=True, parent=MENU_NAME)
         else:
             cmds.menuItem(label=item[0], command=item[1], sourceType="python", parent=MENU_NAME)
+
+    # Custom shapes for every selected joint at once (the Bone & Constraints panel does one joint).
+    from . import custom_shapes
+    submenu = cmds.menuItem(label="Custom Shape (selected joints)", subMenu=True, tearOff=True, parent=MENU_NAME)
+    for shape in custom_shapes.SHAPES:
+        cmds.menuItem(label=shape, parent=submenu, sourceType="python",
+                      command="import maya_blender_like.custom_shapes as c; from maya import cmds; "
+                              "c.assign(cmds.ls(selection=True, type='joint'), {!r})".format(shape))
+    cmds.menuItem(divider=True, parent=submenu)
+    cmds.menuItem(label="Remove", parent=submenu, sourceType="python",
+                  command="import maya_blender_like.custom_shapes as c; from maya import cmds; "
+                          "c.remove(cmds.ls(selection=True, type='joint'))")
 
 
 def apply():

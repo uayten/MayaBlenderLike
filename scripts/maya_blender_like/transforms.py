@@ -1,7 +1,7 @@
 """Blender's Alt+G / Alt+R / Alt+S: clear location, rotation or scale of the selection."""
 from maya import cmds
 
-from . import rest
+from . import drivers, rest
 
 RESET_VALUES = {"translate": 0.0, "rotate": 0.0, "scale": 1.0}
 CHANNELS = ("translate", "rotate", "scale")
@@ -13,9 +13,20 @@ def clear(channel):
     Objects and controls go to 0 (1 for scale). A joint's translate and rotate hold its rest
     position, so joints go back to their rest instead, like a Blender bone: the rest stored by
     edit mode, or the skin's bind pose. Joints with neither are skipped with a warning.
+
+    A node that follows a control through a constraint (a joint driven by CTRL_main, say)
+    clears the control instead, since that is what puts the bone back.
     """
     nodes = cmds.ls(selection=True, transforms=True, long=True) or []
     if not nodes:
+        return
+    nodes, note = drivers.redirect(nodes)
+    if note:
+        cmds.headsUpMessage(note, time=2.0)
+    nodes = [n for n in nodes if _settable(n, channel)]
+    if not nodes:
+        # Nothing can change: say so, and leave no empty step in the undo queue.
+        cmds.warning("Clear {}: every selected channel is locked or driven.".format(channel))
         return
     joints = [n for n in nodes if cmds.nodeType(n) == "joint"]
     others = [n for n in nodes if n not in joints]
@@ -57,6 +68,10 @@ def _bind_pose_values(joints, channel):
             for name, value in values.items():
                 _set_channel(member, name, value)
     return rest_values, unbound
+
+
+def _settable(node, channel):
+    return any(cmds.getAttr("{}.{}{}".format(node, channel, axis), settable=True) for axis in "XYZ")
 
 
 def _set_channel(node, channel, values):
