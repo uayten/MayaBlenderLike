@@ -18,6 +18,8 @@ import maya.api.OpenMaya as om
 
 TAG = "mblCustomShape"
 DEFAULT_LENGTH_CM = 10.0   # size reference for joints without a child
+LEAF_SUFFIX = "_end"       # leaf bones added by Blender's FBX export mark where a bone ends
+ALIGNED = 0.999            # a child this close to a local axis sits on the bone's line
 
 # Unit shapes (points, degree, closed) with Y along the bone, as in Blender's bone space.
 def _circle(points=16, y=0.0, radius=1.0, plane="xz"):
@@ -249,14 +251,17 @@ def _root(joint):
 
 
 def bone_length(node):
-    """Length of a joint's bone (to its first child joint), or the one recorded on a control."""
+    """Length of a joint's bone (to its tail, see _tail), or the one recorded on a control."""
     from . import controls
     if cmds.attributeQuery(controls.BONE_LENGTH, node=node, exists=True):
         return cmds.getAttr(node + "." + controls.BONE_LENGTH)
-    child = _first_child(node)
-    if child is None:
-        return DEFAULT_LENGTH_CM
-    return om.MVector(cmds.getAttr(child + ".translate")[0]).length() or DEFAULT_LENGTH_CM
+    tail = _tail(node)
+    if tail:
+        return tail.length()
+    # In the joint's own units: FBX from Blender can scale joints (100x), and the default is in world cm.
+    world = om.MMatrix(cmds.getAttr(node + ".worldMatrix"))
+    scale = om.MVector(world.getElement(1, 0), world.getElement(1, 1), world.getElement(1, 2)).length()
+    return DEFAULT_LENGTH_CM / (scale or 1.0)
 
 
 def bone_direction(node):
@@ -264,14 +269,28 @@ def bone_direction(node):
     from . import controls
     if cmds.attributeQuery(controls.BONE_AXIS, node=node, exists=True):
         return tuple(cmds.getAttr(node + "." + controls.BONE_AXIS)[0])
-    child = _first_child(node)
-    direction = om.MVector(cmds.getAttr(child + ".translate")[0]) if child else om.MVector()
-    if direction.length() < 1e-6:
-        return (0.0, 1.0, 0.0)
-    direction.normalize()
-    return (direction.x, direction.y, direction.z)
+    tail = _tail(node)
+    if tail is None:
+        return (0.0, 1.0, 0.0)   # Blender's bone axis
+    tail.normalize()
+    return (tail.x, tail.y, tail.z)
 
 
-def _first_child(joint):
-    children = cmds.listRelatives(joint, children=True, type="joint", fullPath=True) or []
-    return children[0] if children else None
+def _tail(joint):
+    """Where the bone ends, in the joint's space, or None when nothing says.
+
+    A Blender bone ends at its tail, which FBX drops: the leaf bone (*_end) Blender's export can
+    add is the tail itself; otherwise a child joint on the joint's Y axis (Blender's bone axis)
+    or X axis (Maya's) sits on the bone's line. Children placed elsewhere say nothing about it.
+    """
+    offsets = [(c, om.MVector(cmds.getAttr(c + ".translate")[0]))
+               for c in cmds.listRelatives(joint, children=True, type="joint", fullPath=True) or []]
+    offsets = [(c, v) for c, v in offsets if v.length() > 1e-6]
+    for child, offset in offsets:
+        if child.endswith(LEAF_SUFFIX):
+            return offset
+    for axis in (om.MVector(0, 1, 0), om.MVector(1, 0, 0)):
+        aligned = [v for _, v in offsets if v.normal() * axis > ALIGNED]
+        if aligned:
+            return min(aligned, key=lambda v: v.length())
+    return None

@@ -23,7 +23,7 @@ from maya import cmds
 from . import controls, custom_shapes, rest
 
 CONTAINER_NAME = "MECH"
-LEAF_SUFFIX = "_end"
+LEAF_SUFFIX = custom_shapes.LEAF_SUFFIX
 CONTROL_SUFFIX = "_ctrl"
 # Connections to these node types belong to the joint's own skeleton bookkeeping, not to the rig.
 SKIPPED_DESTINATIONS = ("dagPose", "skinCluster", "joint")
@@ -53,6 +53,10 @@ def convert_selected_rig():
         len(report["linked"]), len(report["loose"]), len(report["chains"]))
     cmds.headsUpMessage(message, time=3.0)
     print("MayaBlenderLike: " + message)
+    if report["along_x"]:
+        cmds.warning("Convert Rig: the bones run along the joints' X axis (FBX exported with Primary Bone Axis X). "
+                     "Controls follow the joints' axes, so Blender axis names (Track Y, rotate Y) won't match: "
+                     "re-export from Blender with Primary Bone Axis Y and Secondary X, the defaults.")
     return report
 
 
@@ -63,6 +67,7 @@ def convert(skeleton):
     skeleton = cmds.ls(uuids, long=True)
     weighted = deforming_joints(skeleton)
     leaves = [j for j in skeleton if _is_leaf_marker(j, weighted)]
+    along_x = _leaves_along_x(leaves)
     kept = [j for j in skeleton if j in weighted or any(d in weighted for d in _joint_descendants(j))]
     loose, chains = [], []
     for joint in skeleton:
@@ -102,7 +107,8 @@ def convert(skeleton):
     return {"top": top,
             "linked": [current[j] for j in kept],
             "loose": [current[j] for j in loose],
-            "chains": chain_nodes}
+            "chains": chain_nodes,
+            "along_x": along_x}
 
 
 def deforming_joints(joints):
@@ -124,6 +130,15 @@ def rig_group(skeleton):
     for other in rest.roots(skeleton):
         cmds.parent(other, group)
     return cmds.ls(group, long=True)[0]
+
+
+def _leaves_along_x(leaves):
+    """True when most leaf bones sit on their parent's X axis instead of Y (Blender's bone axis)."""
+    votes = 0
+    for leaf in leaves:
+        offset = cmds.getAttr(leaf + ".translate")[0]
+        votes += 1 if abs(offset[0]) > abs(offset[1]) else -1
+    return votes > 0
 
 
 def _is_leaf_marker(joint, weighted):

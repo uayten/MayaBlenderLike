@@ -222,6 +222,16 @@ Blender's Armature → Viewport Display → In Front: see the rig through the me
 
 In Blender you pose the bones themselves, and their channels read 0 at rest. A Maya joint can't do that: its translate holds where the bone sits in its parent. Maya rigs pose **controls** instead. A control's rest is stored in its offset parent matrix, so its channels read 0 / 0 / 1 at rest, and it drives the joint. **Blender Like → Convert to MayaBlenderLike Rig**, with the armature (or any of its joints) selected, builds that layout from a skeleton imported from Blender.
 
+**Export from Blender with these FBX options** (Armature section):
+
+| Option | Value | Why |
+|---|---|---|
+| Primary Bone Axis | **Y** (default) | Keeps Blender's bone space in the joints: the bone runs along Y, so controls point where the bones pointed and constraint axes (Track Y, rotate Y) mean the same as in Blender. With X, every bone looks turned 90° |
+| Secondary Bone Axis | **X** (default) | Same reason |
+| Add Leaf Bones | **On** | FBX has no bone tails; the `*_end` leaf bones carry where each last bone ends, so it keeps its direction and length |
+
+Converting warns when the leaf bones show the bones running along X.
+
 Each joint is sorted by the skin weights actually painted on the mesh. A joint that is a skin influence but has no weight counts as non-deforming.
 
 | Joint | Becomes |
@@ -257,6 +267,7 @@ Limitations:
 
 - The panel's Inverse Kinematics needs a joint chain, so it doesn't work on controls yet. Put the ikHandle on a MECH chain.
 - Keys on the joints from before the conversion are overridden by the controls.
+- FBX doesn't keep the length of a bone that has children. The control takes the distance to a child lying on the bone's line, or 10 cm; adjust it with Scale in the Custom Shape card.
 - Ctrl+A → Pose as Rest Pose is refused on a converted rig; edit the rest in Edit Mode.
 
 ## Viewport navigation
