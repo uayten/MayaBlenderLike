@@ -107,6 +107,17 @@ E on selected joints adds a child joint at each one and starts moving it, like e
 
 Maya has no armature modes: a joint's translate and rotate hold both its rest placement and its pose. The module adds Blender's two modes on top of standard joints.
 
+A label in the top-left corner of the viewport always shows the mode, like Blender's header:
+
+| Label | When |
+|---|---|
+| Object Mode | Objects or nothing selected |
+| Pose Mode | Joints selected: animate them, Alt+G / Alt+R / Alt+S return to rest |
+| Edit Mode - Armature | After Tab on joints: editing the rest |
+| Edit Mode - Mesh | Maya's component mode (Tab on a mesh): vertices, edges, faces |
+
+Object and pose mode aren't separate states in Maya: the label follows the selection. The label shows while the viewport's Heads Up Display is on (**Display → Heads Up Display**).
+
 **Edit mode** (Tab with joints selected, for their whole skeleton):
 
 - Joints go to their rest pose and are drawn light blue; the viewport shows **EDIT MODE**.
@@ -203,7 +214,13 @@ Maya's hotkeys can't tell the numpad from the number row, so the numpad is handl
 
 A **Blender Like** menu in Maya's main menu bar opens the Constraints panel, toggles edit mode, applies Pose as Rest Pose and links to this page.
 
-The first start creates a workspace named **Blender Like**, with the Outliner docked on the right above the Channel Box and Attribute Editor, like Blender's Outliner above Properties. After that the workspace is yours: rearrange it and save it from the workspace menu at the top right of Maya, and the module won't overwrite it. To rebuild it, delete the workspace in Maya and restart.
+The module makes **Blender Like** the current workspace, with the Outliner docked on the right above the Channel Box and Attribute Editor, like Blender's Outliner above Properties.
+
+The workspace travels with this repository, in `workspaces/Blender_Like.json`:
+
+- On a machine where Maya doesn't have it yet (a fresh install), the module installs the repository's copy.
+- Rearrange panels as you like and pick **Blender Like → Save Workspace to GitHub**. It saves the layout, copies it into the repository, commits and pushes. Maya's own Save Workspace keeps the change on this machine only.
+- Maya's local copy always wins at startup, so the module never overwrites a layout you saved in Maya.
 
 The viewport gets Blender's flat gray background and orange active-object highlight.
 
@@ -230,6 +247,7 @@ ENABLE_NUMPAD_VIEWS = True
 NUMPAD_AUTO_PERSPECTIVE = True
 
 ENABLE_MODAL_TRANSFORMS = True
+ENABLE_MODE_INDICATOR = True
 ENABLE_LAYOUT = True
 ENABLE_COLORS = True
 

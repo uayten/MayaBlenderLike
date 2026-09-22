@@ -1,18 +1,38 @@
-"""Blender-like layout and colors: Outliner on the right above the Channel Box, gray viewport, orange selection."""
+"""Blender-like layout and colors: Outliner on the right above the Channel Box, gray viewport, orange selection.
+
+The Blender Like workspace travels with the repository: workspaces/Blender_Like.json is
+installed on a machine that doesn't have it yet, and Blender Like > Save Workspace to GitHub
+copies your current layout back into the repository and pushes it.
+"""
+import os
+import shutil
+import subprocess
+
 from maya import cmds
 
 from . import config
 
 LAYOUT_NAME = "Blender Like"
+LAYOUT_FILE = "Blender_Like.json"   # Maya's file name for the layout in prefs/workspaces
+REPOSITORY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPOSITORY_LAYOUT = os.path.join(REPOSITORY, "workspaces", LAYOUT_FILE)
 
 # Blender's default theme, as 0-1 RGB.
 VIEWPORT_BACKGROUND = (0.239, 0.239, 0.239)   # #3D3D3D
 LEAD_SELECTION = (1.0, 0.667, 0.251)          # active object, #FFAA40
 
 
+def _prefs_layout():
+    return os.path.join(cmds.internalVar(userPrefDir=True), "workspaces", LAYOUT_FILE)
+
+
 def apply_layout():
-    """Create the Blender Like workspace once and make it current. Later edits are yours: save them in Maya."""
+    """Make Blender Like the current workspace: yours if Maya has it, else the repository's, else a new one."""
     if LAYOUT_NAME in (cmds.workspaceLayoutManager(listLayouts=True) or []):
+        cmds.workspaceLayoutManager(setCurrent=LAYOUT_NAME)
+        return
+    if os.path.isfile(REPOSITORY_LAYOUT):
+        cmds.workspaceLayoutManager(i=REPOSITORY_LAYOUT)
         cmds.workspaceLayoutManager(setCurrent=LAYOUT_NAME)
         return
     if not cmds.workspaceControl("Outliner", exists=True):
@@ -21,6 +41,35 @@ def apply_layout():
     cmds.workspaceControl("Outliner", edit=True, dockToControl=("ChannelBoxLayerEditor", "top"))
     cmds.workspaceLayoutManager(saveAs=LAYOUT_NAME)
     cmds.workspaceLayoutManager(setCurrent=LAYOUT_NAME)
+
+
+def save_workspace_to_github():
+    """Save the current Blender Like layout, copy it into the repository, commit and push."""
+    if cmds.workspaceLayoutManager(query=True, current=True) != LAYOUT_NAME:
+        cmds.warning("Switch to the {} workspace first (top right of Maya).".format(LAYOUT_NAME))
+        return
+    cmds.workspaceLayoutManager(save=True)
+    os.makedirs(os.path.dirname(REPOSITORY_LAYOUT), exist_ok=True)
+    shutil.copyfile(_prefs_layout(), REPOSITORY_LAYOUT)
+
+    def git(*args):
+        return subprocess.run(["git"] + list(args), cwd=REPOSITORY, capture_output=True, text=True, timeout=60)
+
+    try:
+        git("add", REPOSITORY_LAYOUT)
+        if git("diff", "--cached", "--quiet").returncode == 0:
+            cmds.headsUpMessage("Workspace unchanged: nothing to push", time=2.0)
+            return
+        git("commit", "-m", "Update Blender Like workspace")
+        pushed = git("push")
+    except (OSError, subprocess.TimeoutExpired) as error:
+        cmds.warning("Workspace saved in the repository, but git failed: {}".format(error))
+        return
+    if pushed.returncode != 0:
+        cmds.warning("Workspace committed locally, push failed: " + pushed.stderr.strip())
+    else:
+        cmds.headsUpMessage("Workspace saved to GitHub", time=2.0)
+        print("MayaBlenderLike: workspace pushed to GitHub")
 
 
 def apply_colors():
@@ -50,6 +99,8 @@ def create_main_menu():
         None,
         ("Toggle Edit Mode   Tab", "import maya_blender_like.modes as m; m.tab()"),
         ("Pose as Rest Pose", "import maya_blender_like.menus as m; m._pose_as_rest()"),
+        None,
+        ("Save Workspace to GitHub", "import maya_blender_like.interface as i; i.save_workspace_to_github()"),
         None,
         ("Hotkeys and Help (README)", "import webbrowser; webbrowser.open('https://github.com/uayten/MayaBlenderLike#contents')"),
     ]

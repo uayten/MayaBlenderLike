@@ -18,6 +18,9 @@ NUMPAD_AUTO_PERSPECTIVE = True     # like Blender: numpad views go orthographic,
 # Off: G / R / S just pick Maya's move, rotate and scale tools.
 ENABLE_MODAL_TRANSFORMS = True
 
+# Label in the viewport's top-left corner: Object Mode, Pose Mode, Edit Mode - Armature / Mesh.
+ENABLE_MODE_INDICATOR = True
+
 # Viewport grid, in centimeters (Maya's default working unit).
 ENABLE_GRID = True
 GRID_HALF_SIZE_CM = 500   # grid spans -5 m to +5 m

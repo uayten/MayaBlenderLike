@@ -10,15 +10,18 @@ Tab again (or Ctrl+Tab) leaves edit mode:
 - the skin is rebound at the new rest, so the mesh doesn't jump,
 - the pose you had before is reapplied on top of the new rest.
 
-Pose mode is Maya's normal state: animate joints and controls; Alt+G/R/S return to rest.
-Tab with anything else selected keeps Maya's object / component toggle.
+Pose mode is Maya's normal state with joints selected: animate them; Alt+G/R/S return to rest.
+Tab with anything else selected keeps Maya's object / component toggle (Blender's mesh edit mode).
+
+A label in the top-left corner of the viewport always says which mode you are in:
+Object Mode, Pose Mode, Edit Mode - Armature, or Edit Mode - Mesh.
 """
 from maya import cmds, mel
 import maya.api.OpenMaya as om
 
 from . import rest
 
-HUD_NAME = "MBL_EditModeHUD"
+HUD_NAME = "MBL_ModeIndicator"
 EDIT_COLOR = 18   # Maya color index: light blue, like Blender's edit bones
 
 _session = None
@@ -37,13 +40,12 @@ def tab():
         enter_edit(joints)
     else:
         mel.eval("SelectToggleMode")
+        _refresh_indicator()
 
 
 def ctrl_tab():
     if _session is not None:
         exit_edit()
-    else:
-        cmds.headsUpMessage("Pose Mode", time=1.0)
 
 
 def enter_edit(joints):
@@ -158,10 +160,36 @@ def _tool_preserve_children(enabled):
         return False
 
 
-def _show_hud(visible):
+def mode_text():
+    """The mode shown in the viewport corner, as in Blender's header."""
+    if _session is not None:
+        return "Edit Mode  -  Armature    (Tab: leave)"
+    selection = cmds.ls(selection=True) or []
+    # Component mode, or components selected (vertices, edges, faces: "mesh.vtx[3]").
+    if cmds.selectMode(query=True, component=True) or any("." in s for s in selection):
+        return "Edit Mode  -  Mesh    (Tab: leave)"
+    if cmds.ls(selection, type="joint"):
+        return "Pose Mode    (Tab: edit the rest)"
+    return "Object Mode"
+
+
+def install_indicator():
+    """Always-on mode label in the top-left corner of every viewport."""
     if cmds.headsUpDisplay(HUD_NAME, exists=True):
         cmds.headsUpDisplay(HUD_NAME, remove=True)
-    if visible:
-        block = cmds.headsUpDisplay(nextFreeBlock=0)
-        cmds.headsUpDisplay(HUD_NAME, section=0, block=block, blockSize="large",
-                            label="EDIT MODE  (Tab to leave)", labelFontSize="large")
+    block = cmds.headsUpDisplay(nextFreeBlock=0)
+    cmds.headsUpDisplay(HUD_NAME, section=0, block=block, blockSize="large", label="",
+                        labelFontSize="large", dataFontSize="large",
+                        command=mode_text, event="SelectionChanged")
+    # Object / component switches don't change the selection event, so refresh on them too.
+    cmds.scriptJob(event=["SelectModeChanged", _refresh_indicator])
+
+
+def _refresh_indicator():
+    if cmds.headsUpDisplay(HUD_NAME, exists=True):
+        cmds.headsUpDisplay(HUD_NAME, refresh=True)
+
+
+def _show_hud(visible):
+    # Edit mode starts or ends: the indicator reads the mode from the session, so just redraw it.
+    _refresh_indicator()

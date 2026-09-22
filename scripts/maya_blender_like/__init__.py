@@ -18,6 +18,8 @@ def startup():
     if config.ENABLE_LAYOUT or config.ENABLE_COLORS:
         _run("interface", lambda: _import("interface").apply())
     _run("menu", lambda: _import("interface").create_main_menu())
+    if config.ENABLE_MODE_INDICATOR:
+        _run("mode indicator", lambda: _import("modes").install_indicator())
 
 
 def _import(name):
