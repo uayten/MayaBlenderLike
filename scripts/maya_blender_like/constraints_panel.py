@@ -16,7 +16,7 @@ except ImportError:  # Maya 2024 and older ship PySide2
     from PySide2 import QtCore, QtGui, QtWidgets
     from shiboken2 import wrapInstance
 
-from . import custom_shapes, owner_constraints, stack
+from . import controls, custom_shapes, owner_constraints, stack
 
 WORKSPACE_NAME = "MBL_ConstraintsPanel"
 AXES = ["X", "Y", "Z", "-X", "-Y", "-Z"]
@@ -80,8 +80,8 @@ def _add_unguarded(owner, kind, target):
     if kind in owner_constraints.LIMIT_CHANNELS:
         owner_constraints.enable_limits(owner, kind)
     elif kind == "IK":
-        if cmds.nodeType(owner) != "joint":
-            cmds.warning("Inverse Kinematics needs a joint chain: select the tip joint.")
+        if cmds.nodeType(owner) != "joint" and not controls.is_control(owner):
+            cmds.warning("Inverse Kinematics needs a joint chain or a rig control: select the tip.")
             return
         owner_constraints.add_ik(owner, target)
     else:
@@ -208,7 +208,7 @@ class ConstraintsPanel(QtWidgets.QWidget):
         cards += [StackCard(self, owner, spec) for spec in stack.specs(owner)]
         cards += [LimitCard(self, owner, kind) for kind in owner_constraints.LIMIT_CHANNELS
                   if owner_constraints.has_limits(owner, kind)]
-        if cmds.nodeType(owner) == "joint" and owner_constraints.ik_handle(owner):
+        if owner_constraints.ik_handle(owner):
             cards.append(IkCard(self, owner))
         for index, card in enumerate(cards):
             self.cards.insertWidget(index, card)

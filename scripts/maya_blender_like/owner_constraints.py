@@ -3,11 +3,13 @@
 - Limit Location / Rotation / Scale: Maya's transform limits on the owner's own channels,
   which is what Blender limits usually do on controls: keep the animator inside a range.
 - Inverse Kinematics: a Maya ikHandle from the owner up its chain, following the target,
-  with an optional pole target.
+  with an optional pole target. On a control of a converted rig, see control_ik.py.
 """
 import functools
 
 from maya import cmds
+
+from . import control_ik, controls
 
 
 def _undoable(function):
@@ -79,6 +81,8 @@ def ik_handle(owner):
 @_undoable
 def add_ik(owner, target=None, pole=None, chain_count=2):
     """IK from the owner up chain_count joints (Blender's Chain Length), solved toward the target."""
+    if controls.is_control(owner):
+        return control_ik.add(owner, target, pole, chain_count)
     start = owner
     for _ in range(max(chain_count, 1) - 1):
         parent = cmds.listRelatives(start, parent=True, fullPath=True, type="joint")
@@ -114,7 +118,9 @@ def ik_settings(owner):
 @_undoable
 def remove_ik(owner):
     handle = ik_handle(owner)
-    if handle:
+    if handle and control_ik.is_control_ik(handle):
+        control_ik.remove(handle)
+    elif handle:
         cmds.delete(handle)
 
 

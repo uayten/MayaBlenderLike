@@ -16,6 +16,8 @@ by the skin weights actually painted on the mesh:
   last bones end: they give those bones their length, then are deleted.
 
 Controls go in a CTRL group in the rig's top group, parented like the bones they stand for.
+Display layers split the rig the Maya way: <rig>_GEO (the skinned meshes, visible but not
+clickable), <rig>_JNT (skeleton and MECH, hidden) and <rig>_CTRL (the controls).
 The conversion is done at the rest pose and is one undo step.
 """
 from maya import cmds
@@ -25,6 +27,7 @@ from . import controls, custom_shapes, rest
 CONTAINER_NAME = "MECH"
 LEAF_SUFFIX = custom_shapes.LEAF_SUFFIX
 CONTROL_SUFFIX = "_ctrl"
+LAYER_REFERENCE = 2   # displayLayer.displayType: drawn normally, but can't be clicked
 # Connections to these node types belong to the joint's own skeleton bookkeeping, not to the rig.
 SKIPPED_DESTINATIONS = ("dagPose", "skinCluster", "joint")
 
@@ -104,11 +107,32 @@ def convert(skeleton):
     if doomed:
         cmds.delete(doomed)
     current = {j: cmds.ls(uid, long=True)[0] for j, uid in uuids.items()}
+    _display_layers(top, kept)
     return {"top": top,
             "linked": [current[j] for j in kept],
             "loose": [current[j] for j in loose],
             "chains": chain_nodes,
             "along_x": along_x}
+
+
+def _display_layers(top, joints):
+    """GEO (reference), JNT (hidden) and CTRL layers for the rig, named after its top group."""
+    rig = _short(top)
+    meshes = set()
+    for cluster in rest.skin_clusters(joints):
+        for shape in cmds.skinCluster(cluster, query=True, geometry=True) or []:
+            meshes.update(cmds.listRelatives(shape, parent=True, fullPath=True) or [])
+    skeleton = rest.roots(joints) + [top + "|" + CONTAINER_NAME]
+    for suffix, members, visible, display in (("_GEO", sorted(meshes), True, LAYER_REFERENCE),
+                                               ("_JNT", skeleton, False, 0),
+                                               ("_CTRL", [top + "|" + controls.CONTAINER_NAME], True, 0)):
+        members = [m for m in members if cmds.objExists(m)]
+        if not members:
+            continue
+        layer = cmds.createDisplayLayer(name=rig + suffix, empty=True)
+        cmds.editDisplayLayerMembers(layer, members, noRecurse=True)
+        cmds.setAttr(layer + ".visibility", visible)
+        cmds.setAttr(layer + ".displayType", display)
 
 
 def deforming_joints(joints):
@@ -161,14 +185,19 @@ def _give_shape(joint, control):
 def _move_chain(joint, top):
     """A non-deforming chain leaves the skeleton for MECH, following the bone it hung from."""
     parent = _parent_joint(joint)
-    container = top + "|" + CONTAINER_NAME
-    if not cmds.objExists(container):
-        container = cmds.ls(cmds.group(empty=True, name=CONTAINER_NAME, parent=top), long=True)[0]
-    moved = cmds.ls(cmds.parent(joint, container)[0], long=True)[0]
+    moved = cmds.ls(cmds.parent(joint, mech_group(top))[0], long=True)[0]
     if parent:
         cmds.parentConstraint(parent, moved, maintainOffset=True)
         cmds.scaleConstraint(parent, moved, maintainOffset=True)
     return moved
+
+
+def mech_group(top):
+    """The rig's MECH group, created on first use."""
+    path = top + "|" + CONTAINER_NAME
+    if cmds.objExists(path):
+        return path
+    return cmds.ls(cmds.group(empty=True, name=CONTAINER_NAME, parent=top), long=True)[0]
 
 
 def _retarget(joint, node):

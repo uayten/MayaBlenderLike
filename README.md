@@ -258,6 +258,8 @@ After converting:
 - **Pose Mode** poses the controls. The Channel Box reads 0 / 0 / 1 at rest, Alt+G / Alt+R / Alt+S clear to it, and keys are relative to the rest, as in Blender.
 - **Edit Mode** edits the joints: the controls hide, the bones show, and on leaving, each control takes its joint's new rest while keeping its pose. Controls that replaced joints keep their place, like Blender's child bones.
 - **Object Mode**: clicking a control or a joint selects the whole rig.
+- **Display layers**, the Maya way to show only what the animator needs (Layer Editor, under the Channel Box): `<rig>_GEO` holds the skinned meshes as Reference (visible, not clickable), `<rig>_JNT` holds the skeleton and MECH, hidden, and `<rig>_CTRL` the controls. Edit Mode shows the JNT layer while editing.
+- **Inverse Kinematics** on a control (Add Object Constraint → Inverse Kinematics, with the target selected first): Maya's ikHandle only solves joints, so the control gets its own joint chain in MECH, from the chain's top control to the owner bone's tail, solved toward the target and pole; the controls of the chain turn with it. Chain Length 0 takes every control above, as in Blender. The chain, like the constraint stacks, is rebuilt when Edit Mode changes the rest.
 - Add constraints to the **controls** in the Bone & Constraints panel. The panel's Custom Shape card works on controls too.
 - FBX: export the skeleton (the joints). Controls and MECH stay in Maya. Bake the animation, since game engines never get constraints.
 
@@ -265,7 +267,7 @@ The conversion is done at the rest pose and is one undo step. A rig that is alre
 
 Limitations:
 
-- The panel's Inverse Kinematics needs a joint chain, so it doesn't work on controls yet. Put the ikHandle on a MECH chain.
+- IK has no influence slider yet: the chain's controls follow the IK fully, and removing the IK returns their rotation to rest.
 - Keys on the joints from before the conversion are overridden by the controls.
 - FBX doesn't keep the length of a bone that has children. The control takes the distance to a child lying on the bone's line, or 10 cm; adjust it with Scale in the Custom Shape card.
 - Ctrl+A → Pose as Rest Pose is refused on a converted rig; edit the rest in Edit Mode.

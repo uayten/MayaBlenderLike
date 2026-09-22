@@ -316,6 +316,13 @@ class EditSession(object):
                            (top + "|" + controls.CONTAINER_NAME for top in tops) if cmds.objExists(c)}
         for container in self.containers:
             cmds.setAttr(container + ".visibility", False)
+        # A converted rig keeps its skeleton in a hidden display layer: show it while editing.
+        self.layers = {}
+        for root in rest.roots(joints):
+            for layer in cmds.listConnections(root + ".drawOverride", source=True, destination=False,
+                                              type="displayLayer") or []:
+                self.layers[layer] = cmds.getAttr(layer + ".visibility")
+                cmds.setAttr(layer + ".visibility", True)
         rest.ensure(joints)
         rest.restore(joints)
         self.old_rest = {j: cmds.xform(j, query=True, objectSpace=True, matrix=True) for j in joints}
@@ -357,6 +364,16 @@ class EditSession(object):
             cmds.setAttr(joint + ".drawStyle", self.draw_styles[joint])
         for container, visible in self.containers.items():
             cmds.setAttr(container + ".visibility", visible)
+        for layer, visible in self.layers.items():
+            cmds.setAttr(layer + ".visibility", visible)
+        # Constraint stacks and IK chains were built at the old rest: rebuild them at the new one.
+        from . import owner_constraints, stack
+        for control in self.controls:
+            if stack.stack_node(control):
+                stack.build(control, stack.specs(control))
+        for control in self.controls:
+            if owner_constraints.ik_handle(control):
+                owner_constraints.set_ik(control)
         _tool_preserve_children(self.move_preserve)
         _show_hud(False)
 
