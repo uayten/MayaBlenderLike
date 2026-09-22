@@ -34,6 +34,30 @@ def store(joints):
             cmds.setAttr("{}.{}".format(joint, attribute), *cmds.getAttr("{}.{}".format(joint, channel))[0])
 
 
+def ensure(joints):
+    """Record a rest for joints that have none: the skin's bind pose, or else their current placement."""
+    missing = [j for j in joints if not has_rest(j)]
+    if not missing:
+        return
+    poses = cmds.dagPose(missing, query=True, bindPose=True) or []
+    if poses:
+        snapshot = {j: cmds.xform(j, query=True, objectSpace=True, matrix=True) for j in joints}
+        try:
+            cmds.dagPose(missing, restore=True, name=poses[0])
+        except RuntimeError:
+            pass   # joints driven by constraints can't reach the pose: they keep their placement
+        store(missing)
+        for joint, matrix in snapshot.items():
+            _set_matrix(joint, matrix)
+    else:
+        store(missing)
+
+
+def _set_matrix(joint, matrix):
+    if all(cmds.getAttr("{}.{}{}".format(joint, c, a), settable=True) for c in CHANNELS for a in "XYZ"):
+        cmds.xform(joint, objectSpace=True, matrix=matrix)
+
+
 def restore(joints):
     """Put joints back at their stored rest; joints without one are left alone."""
     for joint in joints:

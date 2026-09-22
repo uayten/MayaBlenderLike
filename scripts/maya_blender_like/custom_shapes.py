@@ -7,6 +7,9 @@ the shapes without this module. FBX exports skip the curves and keep a clean ske
 
 Shapes are built in bone space: their Y axis runs along the bone (toward the first child
 joint) and they are scaled by the bone length, like Blender's "Scale to Bone Length".
+
+On a converted rig (see mechanisms.py) the shape goes on the bone's control instead: asking
+for a joint's custom shape reaches the control that drives it.
 """
 import math
 
@@ -26,7 +29,11 @@ def _circle(points=16, y=0.0, radius=1.0, plane="xz"):
     return result
 
 
+_W = 0.1   # Blender's octahedral bone: widest at 10% of its length, 10% wide
 SHAPES = {
+    "Bone": [[(-_W, _W, -_W), (_W, _W, -_W), (_W, _W, _W), (-_W, _W, _W), (-_W, _W, -_W)],
+             [(0, 0, 0), (-_W, _W, -_W), (0, 1, 0), (_W, _W, _W), (0, 0, 0)],
+             [(0, 0, 0), (_W, _W, -_W), (0, 1, 0), (-_W, _W, _W), (0, 0, 0)]],
     "Circle": [_circle()],
     "Square": [[(-1, 0, -1), (1, 0, -1), (1, 0, 1), (-1, 0, 1), (-1, 0, -1)]],
     "Cube": [[(-1, -1, -1), (1, -1, -1), (1, -1, 1), (-1, -1, 1), (-1, -1, -1), (-1, 1, -1), (1, 1, -1),
@@ -44,48 +51,104 @@ COLORS = {"Yellow": 17, "Orange": 21, "Red": 13, "Pink": 20, "Blue": 6, "Light B
           "Green": 14, "Light Green": 26, "Purple": 9, "White": 16}
 
 
-def shapes(joint):
-    """The custom shape curves under a joint."""
-    return [s for s in cmds.listRelatives(joint, shapes=True, fullPath=True, type="nurbsCurve") or []
+def shape_owner(node):
+    """Where a node's custom shape lives: the control of a joint driven by one, otherwise the node itself."""
+    from . import controls
+    node = cmds.ls(node, long=True)[0]
+    if cmds.nodeType(node) == "joint":
+        return controls.control_of(node) or node
+    return node
+
+
+def accepts(node):
+    """Joints and controls can have a custom shape."""
+    from . import controls
+    return cmds.nodeType(node) == "joint" or controls.is_control(node)
+
+
+def shapes(node):
+    """The custom shape curves of a joint or control."""
+    return [s for s in cmds.listRelatives(shape_owner(node), shapes=True, fullPath=True, type="nurbsCurve") or []
             if cmds.attributeQuery(TAG, node=s, exists=True)]
 
 
-def settings(joint):
-    """Current custom shape of a joint: name, size, color, bone hidden. None if it has no custom shape."""
-    found = shapes(joint)
+def settings(node):
+    """Current custom shape: name, size, color, bone hidden. None if it has no custom shape."""
+    found = shapes(node)
     if not found:
         return None
     first = found[0]
+    owner = shape_owner(node)
+    hidden = cmds.nodeType(owner) != "joint" or cmds.getAttr(owner + ".drawStyle") == 2
     return {"shape": cmds.getAttr(first + ".mblShapeName"), "size": cmds.getAttr(first + ".mblShapeSize"),
-            "color": cmds.getAttr(first + ".overrideColor"), "hide_bone": cmds.getAttr(joint + ".drawStyle") == 2}
+            "color": cmds.getAttr(first + ".overrideColor"), "hide_bone": hidden}
 
 
-def assign(joints, shape="Circle", size=1.0, color=COLORS["Yellow"], hide_bone=True, source=None):
-    """Give each joint a custom shape. shape: a SHAPES name, or source: a curve transform to copy."""
+def assign(nodes, shape="Circle", size=1.0, color=COLORS["Yellow"], hide_bone=True, source=None):
+    """Give each joint or control a custom shape. shape: a SHAPES name, or source: a curve transform to copy."""
     cmds.undoInfo(openChunk=True, chunkName="custom_shape")
     try:
-        for joint in cmds.ls(joints, type="joint", long=True):
-            _clear_shapes(joint)
-            for curve_shape in _build(joint, shape, size, source):
-                cmds.addAttr(curve_shape, longName=TAG, attributeType="bool", defaultValue=True)
-                cmds.addAttr(curve_shape, longName="mblShapeName", dataType="string")
-                cmds.setAttr(curve_shape + ".mblShapeName", "Custom" if source else shape, type="string")
-                cmds.addAttr(curve_shape, longName="mblShapeSize", attributeType="double", defaultValue=size)
+        for owner in _owners(nodes):
+            _clear_shapes(owner)
+            for curve_shape in _build(owner, shape, size, source):
+                tag(curve_shape, "Custom" if source else shape, size)
                 cmds.setAttr(curve_shape + ".overrideEnabled", True)
                 cmds.setAttr(curve_shape + ".overrideColor", color)
-            cmds.setAttr(joint + ".drawStyle", 2 if hide_bone else 0)
+            if cmds.nodeType(owner) == "joint":
+                cmds.setAttr(owner + ".drawStyle", 2 if hide_bone else 0)
     finally:
         cmds.undoInfo(closeChunk=True)
 
 
-def remove(joints):
+def remove(nodes):
     cmds.undoInfo(openChunk=True, chunkName="remove_custom_shape")
     try:
-        for joint in cmds.ls(joints, type="joint", long=True):
-            _clear_shapes(joint)
-            cmds.setAttr(joint + ".drawStyle", 0)
+        for owner in _owners(nodes):
+            _clear_shapes(owner)
+            if cmds.nodeType(owner) == "joint":
+                cmds.setAttr(owner + ".drawStyle", 0)
+            else:
+                build(owner, "Bone")   # a control can't go without a shape: back to the bone's
     finally:
         cmds.undoInfo(closeChunk=True)
+
+
+def tag(curve_shape, name, size):
+    cmds.addAttr(curve_shape, longName=TAG, attributeType="bool", defaultValue=True)
+    cmds.addAttr(curve_shape, longName="mblShapeName", dataType="string")
+    cmds.setAttr(curve_shape + ".mblShapeName", name, type="string")
+    cmds.addAttr(curve_shape, longName="mblShapeSize", attributeType="double", defaultValue=size)
+
+
+def build(owner, shape, size=1.0):
+    """Tagged curves of a SHAPES name under a joint or control, in Maya's default color."""
+    created = _build(owner, shape, size, None)
+    for curve_shape in created:
+        tag(curve_shape, shape, size)
+    return created
+
+
+def armature_joint(node):
+    """A joint of the node's armature: the joint itself, the one a control drives, or one in the control's rig."""
+    from . import controls
+    if cmds.nodeType(node) == "joint":
+        return node
+    joint = controls.linked_joint(node)
+    if joint:
+        return joint
+    top = "|" + cmds.ls(node, long=True)[0].split("|")[1]
+    linked = [controls.linked_joint(c) for c in controls.in_rig(top)]
+    return next((j for j in linked if j), None)
+
+
+def _owners(nodes):
+    result = []
+    for node in cmds.ls(nodes, long=True):
+        if accepts(node):
+            owner = shape_owner(node)
+            if owner not in result:
+                result.append(owner)
+    return result
 
 
 def _clear_shapes(joint):
@@ -95,7 +158,7 @@ def _clear_shapes(joint):
 
 
 def _build(joint, shape, size, source):
-    """Curves created under a temporary transform in bone space, then moved onto the joint."""
+    """Curves created under a temporary transform in bone space, then moved onto the joint or control."""
     length = bone_length(joint)
     holder = cmds.group(empty=True, name="mblShapeHolder")
     holder = cmds.parent(holder, joint, relative=True)[0]
@@ -112,7 +175,7 @@ def _build(joint, shape, size, source):
             cmds.delete(curve)
         scale = size * length
     # Bone space: shape Y along the direction to the first child joint.
-    rotation = om.MQuaternion(om.MVector(0, 1, 0), _bone_direction(joint)).asEulerRotation()
+    rotation = om.MQuaternion(om.MVector(0, 1, 0), om.MVector(bone_direction(joint))).asEulerRotation()
     cmds.setAttr(holder + ".rotate", *[math.degrees(v) for v in (rotation.x, rotation.y, rotation.z)])
     cmds.setAttr(holder + ".scale", scale, scale, scale)
     cmds.makeIdentity(holder, apply=True, rotate=True, scale=True)
@@ -185,19 +248,28 @@ def _root(joint):
     return rest.roots([joint])[0]
 
 
-def bone_length(joint):
-    child = _first_child(joint)
+def bone_length(node):
+    """Length of a joint's bone (to its first child joint), or the one recorded on a control."""
+    from . import controls
+    if cmds.attributeQuery(controls.BONE_LENGTH, node=node, exists=True):
+        return cmds.getAttr(node + "." + controls.BONE_LENGTH)
+    child = _first_child(node)
     if child is None:
         return DEFAULT_LENGTH_CM
     return om.MVector(cmds.getAttr(child + ".translate")[0]).length() or DEFAULT_LENGTH_CM
 
 
-def _bone_direction(joint):
-    child = _first_child(joint)
-    if child is None:
-        return om.MVector(0, 1, 0)
-    direction = om.MVector(cmds.getAttr(child + ".translate")[0])
-    return direction.normal() if direction.length() > 1e-6 else om.MVector(0, 1, 0)
+def bone_direction(node):
+    """Unit direction of a joint's bone in its own space, or the one recorded on a control."""
+    from . import controls
+    if cmds.attributeQuery(controls.BONE_AXIS, node=node, exists=True):
+        return tuple(cmds.getAttr(node + "." + controls.BONE_AXIS)[0])
+    child = _first_child(node)
+    direction = om.MVector(cmds.getAttr(child + ".translate")[0]) if child else om.MVector()
+    if direction.length() < 1e-6:
+        return (0.0, 1.0, 0.0)
+    direction.normalize()
+    return (direction.x, direction.y, direction.z)
 
 
 def _first_child(joint):

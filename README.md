@@ -5,8 +5,9 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 - **Viewport navigation without Alt**: middle mouse orbits, Shift + middle pans, Ctrl + middle dollies
 - **Numpad views**: 1 / 3 / 7 for front, right and top in orthographic, Ctrl for the opposite side, 5 to toggle orthographic and perspective, `.` to frame the selection
 - **Edit mode and pose mode for skeletons**: Tab on joints edits the rest with the mesh standing still, then rebinds the skin; Alt+G / Alt+R / Alt+S return to that rest
-- **Custom shapes for joints**: circle, square, cube, sphere, diamond, arrow or any curve of yours, scaled by bone length, bone hidden; plain Maya data that works for anyone who opens the file
-- **Armature In Front and mechanism bones**: see the rig through meshes; turn Blender's non-deforming helper bones into Maya locators or groups
+- **Custom shapes for joints and controls**: bone, circle, square, cube, sphere, diamond, arrow or any curve of yours, scaled by bone length, bone hidden; plain Maya data that works for anyone who opens the file
+- **Convert a Blender skeleton into a Maya rig**: one click gives every bone a control that reads 0 / 0 / 1 at rest, like a Blender pose bone, and moves mechanism chains out of the exported skeleton
+- **Armature In Front**: see the rig through meshes
 - **Constraints panel with Blender's stack**: Blender constraint names, top-to-bottom order, influence, Apply, built from standard Maya nodes
 - **Modal transforms**: G / R / S follow the mouse, X / Y / Z lock an axis, type a value, click to confirm, right-click to cancel; E extrudes joints like bones
 - **Blender hotkeys and menus**: Shift+A add, Ctrl+A apply, X delete, H / Shift+H / Alt+H hide and reveal, Alt+G / Alt+R / Alt+S clear transforms, Tab for components, A to select all, Shift+D to duplicate, Ctrl+P to parent, N for the sidebar, and more
@@ -24,7 +25,7 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 - [Constraints panel](#constraints-panel)
 - [Custom shapes](#custom-shapes)
 - [In Front](#in-front)
-- [Mechanism bones](#mechanism-bones)
+- [Convert to a MayaBlenderLike rig](#convert-to-a-mayablenderlike-rig)
 - [Viewport navigation](#viewport-navigation)
 - [Numpad views](#numpad-views)
 - [Layout and colors](#layout-and-colors)
@@ -119,7 +120,7 @@ Maya has no armature modes: a joint's translate and rotate hold both its rest pl
 | Mode | For | What changes |
 |---|---|---|
 | **Object Mode** | Working on the scene | Maya as usual, except for bones: clicking any joint, or any control of its rig (a curve in the same top group), selects its **armature**, and the whole bone hierarchy highlights. Curves outside a rig select normally. The default |
-| **Pose Mode** | Animating | Only entered with an armature selected (or from its edit mode). Only that armature's joints and its rig's controls (curves) can be selected. Only the selected joint highlights, not its whole hierarchy. Alt+G / Alt+R / Alt+S return joints to rest. Stays on with nothing selected |
+| **Pose Mode** | Animating | Only entered with an armature selected (or from its edit mode). Only that armature's joints and its rig's controls (curves) can be selected; on a [converted rig](#convert-to-a-mayablenderlike-rig) a joint selects its control, and A selects every control. Only the selected joint highlights, not its whole hierarchy. Alt+G / Alt+R / Alt+S return joints to rest. Stays on with nothing selected |
 | **Edit Mode** | Editing the rig | Only the joints of the rig being edited can be selected. See below |
 
 | Key (over a viewport) | Effect |
@@ -199,7 +200,8 @@ Differences from Blender:
 
 Blender's Bone → Viewport Display → Custom Shape, for Maya joints.
 
-- In the **Bone & Constraints** panel, a joint shows a **Custom Shape** card: shape (Circle, Square, Cube, Sphere, Diamond, Arrow, Line, or **From Selected Curve** to copy any curve of yours), scale, color, and **Hide bone** to show only the shape.
+- In the **Bone & Constraints** panel, a joint or control shows a **Custom Shape** card: shape (Bone, Circle, Square, Cube, Sphere, Diamond, Arrow, Line, or **From Selected Curve** to copy any curve of yours), scale, color, and **Hide bone** to show only the shape.
+- On a [converted rig](#convert-to-a-mayablenderlike-rig) the shape goes on the bone's control. Setting it to None there brings back the Bone shape, since a control needs one.
 - **Blender Like → Custom Shape (selected joints)** applies a shape to several joints at once, or removes it.
 - Shapes are built in bone space: Y runs along the bone, toward the first child joint, and the size follows the bone length, like Blender's Scale to Bone Length. A copied curve keeps its own size, times the scale.
 - Clicking the shape selects the joint.
@@ -216,21 +218,46 @@ Blender's Armature → Viewport Display → In Front: see the rig through the me
 - Curves: the custom shapes and controls in the rig's top group get **Always Draw On Top** each.
 - The setting is saved on the skeleton's top joint, and viewports pick it up again when the scene opens, once Maya has restored the panel settings stored in the file. With the armature selected, the Bone & Constraints panel shows an **Armature** card with the same checkbox.
 
-## Mechanism bones
+## Convert to a MayaBlenderLike rig
 
-Blender rigs use non-deforming bones as pivots, targets and helpers. Maya rigs use **locators** (a visible point, good as a constraint target or pivot) or **groups** (an invisible transform, good as an offset). **Blender Like → Mechanism Bones**:
+In Blender you pose the bones themselves, and their channels read 0 at rest. A Maya joint can't do that: its translate holds where the bone sits in its parent. Maya rigs pose **controls** instead. A control's rest is stored in its offset parent matrix, so its channels read 0 / 0 / 1 at rest, and it drives the joint. **Blender Like → Convert to MayaBlenderLike Rig**, with the armature (or any of its joints) selected, builds that layout from a skeleton imported from Blender.
 
-1. **Select Non-Deforming Joints of the Rig**: with the rig (or any part of it) selected, switches to pose mode (joints aren't selectable in object mode) and selects the joints that deform no mesh.
-2. **Convert Selected to Locators** or **Convert Selected to Groups**.
+Each joint is sorted by the skin weights actually painted on the mesh. A joint that is a skin influence but has no weight counts as non-deforming.
 
-Each converted joint becomes a locator or group:
+| Joint | Becomes |
+|---|---|
+| Deforming, or with deforming joints below it (a root, say) | Stays a joint, in the skeleton that FBX exports. Gets a control that drives it (parent + scale constraint), shaped like a Blender bone, or with its custom shape moved over |
+| Non-deforming, no joints below (IK target, pole, pivot) | Replaced by a control; constraints that used the joint as a target now use the control |
+| Non-deforming, with joints below (IK / FK mechanism chain) | Stays a joint chain, so an ikHandle can use it, moved into a **MECH** group and following the bone it hung from |
+| Leaf bone from Blender's FBX export (`*_end`, "Add Leaf Bones") | Gives its parent bone its length, then is deleted |
 
-- with the same name, world position and orientation,
-- inside a **MECH** group beside the skeleton (`RIG|MECH`), so the skeleton keeps only deforming joints,
-- still following the bone it hung from (parent and scale constraints with offset), with non-deforming children kept under it,
-- with constraints that used the joint as a target reconnected to it.
+The result, inside the rig's top group (a skeleton at the world root gets a `<root>_rig` group):
 
-Conversion is refused in edit mode, since it deletes joints that edit mode is holding. Left as joints, and listed in a warning: joints that deform the mesh, joints with deforming joints below them (removing them would cut the skeleton), and joints driven by a constraint. The conversion is one undo step.
+```
+Armature
+  root ...            the skeleton: joints only, bones hidden (the controls draw them)
+  CTRL
+    root_ctrl         one control per bone, parented like the bones
+      spine_ctrl
+  MECH
+    mch_a ...         mechanism chains
+```
+
+After converting:
+
+- **Pose Mode** poses the controls. The Channel Box reads 0 / 0 / 1 at rest, Alt+G / Alt+R / Alt+S clear to it, and keys are relative to the rest, as in Blender.
+- **Edit Mode** edits the joints: the controls hide, the bones show, and on leaving, each control takes its joint's new rest while keeping its pose. Controls that replaced joints keep their place, like Blender's child bones.
+- **Object Mode**: clicking a control or a joint selects the whole rig.
+- Add constraints to the **controls** in the Bone & Constraints panel. The panel's Custom Shape card works on controls too.
+- FBX: export the skeleton (the joints). Controls and MECH stay in Maya. Bake the animation, since game engines never get constraints.
+
+The conversion is done at the rest pose and is one undo step. A rig that is already converted is left alone.
+
+Limitations:
+
+- The panel's Inverse Kinematics needs a joint chain, so it doesn't work on controls yet. Put the ikHandle on a MECH chain.
+- Keys on the joints from before the conversion are overridden by the controls.
+- Ctrl+A → Pose as Rest Pose is refused on a converted rig; edit the rest in Edit Mode.
 
 ## Viewport navigation
 

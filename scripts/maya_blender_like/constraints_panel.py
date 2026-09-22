@@ -194,7 +194,7 @@ class ConstraintsPanel(QtWidgets.QWidget):
             self.owner_label.setText("Select an object or joint")
             return
         self.owner_label.setText(owner.rsplit("|", 1)[-1])
-        cards = [CustomShapeCard(self, owner)] if cmds.nodeType(owner) == "joint" else []
+        cards = [CustomShapeCard(self, owner)] if custom_shapes.accepts(owner) else []
         armature_joints = cmds.listRelatives(owner, allDescendents=True, type="joint", fullPath=True) or []
         if cmds.nodeType(owner) != "joint" and armature_joints:
             cards.append(ArmatureCard(self, owner, armature_joints))
@@ -384,8 +384,10 @@ class CustomShapeCard(Card):
     def __init__(self, panel, owner):
         super(CustomShapeCard, self).__init__(panel, owner, "Viewport Display")
         in_front = QtWidgets.QCheckBox("In Front (whole armature: see it through meshes)")
-        in_front.setChecked(custom_shapes.in_front(owner))
-        in_front.toggled.connect(lambda checked: self.panel.run(lambda: custom_shapes.set_in_front([owner], checked)))
+        bone = custom_shapes.armature_joint(owner)
+        in_front.setEnabled(bone is not None)
+        in_front.setChecked(bool(bone) and custom_shapes.in_front(bone))
+        in_front.toggled.connect(lambda checked: self.panel.run(lambda: custom_shapes.set_in_front([bone], checked)))
         self.body.addRow("", in_front)
         current = custom_shapes.settings(owner) or {"shape": self.NONE, "size": 1.0,
                                                     "color": custom_shapes.COLORS["Yellow"], "hide_bone": True}
@@ -431,10 +433,7 @@ class CustomShapeCard(Card):
         if shape == self.FROM_CURVE:
             self.panel.start_pick(lambda node: custom_shapes.assign([owner], source=node, **options), "curve")
         elif shape == "Custom":
-            source_shapes = custom_shapes.shapes(owner)
-            # Recolor / re-hide a copied curve in place; its geometry stays as it was.
-            self.panel.run(lambda: [cmds.setAttr(s + ".overrideColor", options["color"]) for s in source_shapes]
-                           + [cmds.setAttr(owner + ".drawStyle", 2 if options["hide_bone"] else 0)])
+            self.panel.run(lambda: _restyle_custom(owner, options))
         else:
             self.panel.run(lambda: custom_shapes.assign([owner], shape, **options))
 
@@ -452,3 +451,11 @@ class IkCard(Card):
         chain.setValue(settings["chain_count"])
         chain.editingFinished.connect(lambda: self.panel.run(lambda: owner_constraints.set_ik(owner, chain_count=chain.value())))
         self.body.addRow("Chain Length", chain)
+
+
+def _restyle_custom(owner, options):
+    """Recolor / re-hide a copied curve in place; its geometry stays as it was."""
+    for curve_shape in custom_shapes.shapes(owner):
+        cmds.setAttr(curve_shape + ".overrideColor", options["color"])
+    if cmds.nodeType(owner) == "joint":
+        cmds.setAttr(owner + ".drawStyle", 2 if options["hide_bone"] else 0)

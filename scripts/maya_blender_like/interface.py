@@ -130,16 +130,10 @@ def create_main_menu():
     cmds.menuItem(label="Armature In Front: Off", parent=MENU_NAME, sourceType="python",
                   command=rig + "import maya_blender_like.custom_shapes as c; c.set_in_front(joints, False)")
 
-    # Blender mechanism bones (non-deforming) -> Maya locators or groups.
-    mechanisms = cmds.menuItem(label="Mechanism Bones", subMenu=True, tearOff=True, parent=MENU_NAME)
-    cmds.menuItem(label="Select Non-Deforming Joints of the Rig", parent=mechanisms, sourceType="python",
-                  command="import maya_blender_like.mechanisms as m; m.select_mechanisms()")
-    cmds.menuItem(label="Convert Selected to Locators", parent=mechanisms, sourceType="python",
-                  command="import maya_blender_like.mechanisms as m; from maya import cmds; "
-                          "m.convert(cmds.ls(selection=True, type='joint'), m.LOCATOR)")
-    cmds.menuItem(label="Convert Selected to Groups", parent=mechanisms, sourceType="python",
-                  command="import maya_blender_like.mechanisms as m; from maya import cmds; "
-                          "m.convert(cmds.ls(selection=True, type='joint'), m.GROUP)")
+    # A skeleton from Blender -> controls at 0 / 0 / 1 driving joints, mechanism chains in MECH.
+    cmds.menuItem(label="Convert to MayaBlenderLike Rig", parent=MENU_NAME, sourceType="python",
+                  annotation="Controls for the bones, mechanisms apart: select the armature first",
+                  command="import maya_blender_like.mechanisms as m; m.convert_selected_rig()")
 
 
 def apply():

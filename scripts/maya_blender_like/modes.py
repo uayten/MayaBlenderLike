@@ -5,11 +5,13 @@ editor (the selection is checked after every change):
 - Object mode (default): everything but joints and rig controls, for working on the scene;
   clicking either selects the armature, as clicking a bone or its custom shape does in Blender.
 - Pose mode, for animating: joints and controls only; only the selected joint highlights
-  (not its whole hierarchy), and Alt+G/R/S return joints to their rest.
+  (not its whole hierarchy), and Alt+G/R/S return joints to their rest. On a converted rig
+  (mechanisms.py) a joint selects the control that drives it.
 - Edit mode, for editing the rig: the rig's joints only; joints go to their rest pose, the skin is paused so the
   mesh stays still, moving a joint leaves its children in place, joints are drawn light blue.
   Leaving it makes the new placement the rest (rotation goes into jointOrient), rebinds the
-  skin so the mesh doesn't jump, and reapplies the pose on top.
+  skin so the mesh doesn't jump, and reapplies the pose on top. On a converted rig the controls
+  hide while editing and take the joints' new rest when leaving, keeping their pose channels.
 
 Tab: from object mode with a rig selected (a joint, or a group or control with joints under
 it), enter edit mode; from edit or pose mode, back to object mode; with a mesh selected, Maya's
@@ -21,7 +23,7 @@ A label in the top-left corner of the viewport always says which mode you are in
 from maya import cmds, mel
 import maya.api.OpenMaya as om
 
-from . import rest
+from . import controls, rest
 
 HUD_NAME = "MBL_ModeIndicator"
 ACTIVE_HUD_NAME = "MBL_ActiveIndicator"
@@ -113,7 +115,9 @@ def select_all():
     """Blender's A: every bone of the armature in pose or edit mode, Maya's Select All in object mode."""
     mode = current_mode()
     if mode == POSE:
-        cmds.select(sorted(_pose_joints), replace=True)
+        bones = [controls.control_of(j) or j for j in sorted(_pose_joints)]
+        bones += [c for rig in sorted(_pose_rigs) for c in controls.in_rig(rig) if c not in bones]
+        cmds.select(bones, replace=True)
     elif mode == EDIT:
         cmds.select(sorted(_session.joint_set), replace=True)
     else:
@@ -132,8 +136,12 @@ def armature(node):
 
     Moving it moves the whole rig, as moving an armature object does in Blender.
     """
+    from . import mechanisms
     root = rest.roots([node])[0]
     parent = cmds.listRelatives(root, parent=True, fullPath=True)
+    if parent and parent[0].rsplit("|", 1)[-1] == mechanisms.CONTAINER_NAME:
+        # A mechanism chain of a converted rig belongs to the rig around its MECH group.
+        parent = cmds.listRelatives(parent[0], parent=True, fullPath=True) or parent
     return parent[0] if parent else root
 
 
@@ -143,6 +151,8 @@ def control_armature(node):
         return None
     path = cmds.ls(node, long=True)[0]
     top = "|" + path.split("|")[1]
+    if controls.is_control(path):
+        return top   # a converted rig: its top group holds skeleton, controls and mechanisms
     joints = cmds.listRelatives(top, allDescendents=True, type="joint", fullPath=True)
     return armature(joints[-1]) if joints else None
 
@@ -212,6 +222,8 @@ def _enforce_selection():
                 node = armature(node)
             else:
                 node = control_armature(node) or node
+        elif mode == POSE and cmds.ls(node, type="joint"):
+            node = controls.control_of(node) or node   # the bone is posed through its control
         if not _allowed(node, mode):
             refused = True
         elif node not in kept:
@@ -270,6 +282,10 @@ def exit_edit():
 def apply_pose_as_rest(joints):
     """Blender's Apply > Pose as Rest Pose: the current pose becomes the rest; the mesh returns to its bind shape."""
     joints = rest.skeleton(joints)
+    if any(controls.control_of(j) for j in joints):
+        # The pose lives on the controls: baking it into the joints would apply it twice.
+        cmds.warning("Pose as Rest Pose: not available on a converted rig yet. Edit the rest in Edit Mode (Tab).")
+        return
     cmds.undoInfo(openChunk=True, chunkName="pose_as_rest")
     try:
         for joint in joints:
@@ -286,7 +302,21 @@ class EditSession(object):
         self.joints = joints
         self.joint_set = set(cmds.ls(joints, long=True))
         self.pose = {j: cmds.xform(j, query=True, objectSpace=True, matrix=True) for j in joints}
-        self._ensure_rest()
+        # A converted rig: joints follow controls. Free the joints and hide the controls while editing.
+        tops = sorted({"|" + j.split("|")[1] for j in self.joint_set})
+        self.controls = [c for top in tops for c in controls.in_rig(top)]
+        self.control_rest = controls.rest_worlds(self.controls)
+        self.linked = {j: controls.control_of(j) for j in joints if controls.control_of(j)}
+        for joint in self.linked:
+            controls.unlink(joint)
+        self.draw_styles = {j: cmds.getAttr(j + ".drawStyle") for j in self.linked}
+        for joint in self.linked:
+            cmds.setAttr(joint + ".drawStyle", 0)
+        self.containers = {c: cmds.getAttr(c + ".visibility") for c in
+                           (top + "|" + controls.CONTAINER_NAME for top in tops) if cmds.objExists(c)}
+        for container in self.containers:
+            cmds.setAttr(container + ".visibility", False)
+        rest.ensure(joints)
         rest.restore(joints)
         self.old_rest = {j: cmds.xform(j, query=True, objectSpace=True, matrix=True) for j in joints}
         self.envelopes = {c: cmds.getAttr(c + ".envelope") for c in rest.skin_clusters(joints)}
@@ -298,21 +328,6 @@ class EditSession(object):
         self.move_preserve = _tool_preserve_children(True)
         _show_hud(True)
 
-    def _ensure_rest(self):
-        # First edit of a skeleton: its rest is the bind pose if skinned, otherwise its current placement.
-        missing = [j for j in self.joints if not rest.has_rest(j)]
-        if not missing:
-            return
-        poses = cmds.dagPose(missing, query=True, bindPose=True) or []
-        if poses:
-            snapshot = {j: cmds.xform(j, query=True, objectSpace=True, matrix=True) for j in self.joints}
-            cmds.dagPose(missing, restore=True, name=poses[0])
-            rest.store(missing)
-            for joint, matrix in snapshot.items():
-                cmds.xform(joint, objectSpace=True, matrix=matrix)
-        else:
-            rest.store(missing)
-
     def finish(self):
         joints = self.joints
         for joint in joints:
@@ -321,14 +336,27 @@ class EditSession(object):
         rest.rebind(joints)
         for cluster, envelope in self.envelopes.items():
             cmds.setAttr(cluster + ".envelope", envelope)
+        # Controls take their joint's new rest; the others keep theirs, as Blender's child bones stay put.
+        new_rest = dict(self.control_rest)
+        for joint, control in self.linked.items():
+            new_rest[control] = om.MMatrix(cmds.getAttr(joint + ".worldMatrix"))
+        controls.set_rest_worlds(new_rest)
         # Reapply the pose relative to the new rest: pose = delta * rest, so new = delta * new rest.
+        # A joint driven by a control gets its pose back from the control's channels instead.
         for joint in joints:
+            if joint in self.linked:
+                continue
             delta = om.MMatrix(self.pose[joint]) * om.MMatrix(self.old_rest[joint]).inverse()
             new_rest = om.MMatrix(cmds.xform(joint, query=True, objectSpace=True, matrix=True))
             if not delta.isEquivalent(om.MMatrix(), 1e-6):
                 _set_local_matrix(joint, delta * new_rest)
         for joint, (enabled, color) in self.colors.items():
             _set_color(joint, enabled, color)
+        for joint, control in self.linked.items():
+            controls.link(control, joint)
+            cmds.setAttr(joint + ".drawStyle", self.draw_styles[joint])
+        for container, visible in self.containers.items():
+            cmds.setAttr(container + ".visibility", visible)
         _tool_preserve_children(self.move_preserve)
         _show_hud(False)
 
