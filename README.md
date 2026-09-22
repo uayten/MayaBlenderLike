@@ -109,7 +109,7 @@ With the mouse over a viewport and something selected, G, R and S work as in Ble
 | Left click / Enter | Confirm, as one undo step |
 | Right click / Esc | Cancel |
 
-The pivot is the median of the selected origins, or of the selected components in component mode. A child whose parent is also selected moves once, as in Blender. Locked or driven channels are skipped with a warning. The current value shows in the viewport while you drag.
+The pivot is the median of the selected origins, or of the selected components in component mode. Rotating and scaling several objects swings them around that point, like Blender's Median Point pivot, while each one turns and grows around its own origin. A child whose parent is also selected moves once, as in Blender. Locked or driven channels are skipped with a warning. The current value shows in the viewport while you drag.
 
 E on selected joints adds a child joint at each one and starts moving it, like extruding a bone. The extrusion and the move are two undo steps.
 

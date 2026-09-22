@@ -188,16 +188,37 @@ class ModalTransform(object):
             _safely(cmds.move, vector.x, vector.y, vector.z, targets, relative=True, worldSpace=True, **keep_children)
         elif self.mode == ROTATE:
             angle = -value if invert else value
-            rotation = om.MQuaternion(math.radians(angle), self._rotation_axis()).asEulerRotation()
+            quaternion = om.MQuaternion(math.radians(angle), self._rotation_axis())
+            rotation = quaternion.asEulerRotation()
+            if self.components:
+                _safely(cmds.rotate, math.degrees(rotation.x), math.degrees(rotation.y), math.degrees(rotation.z),
+                        targets, relative=True, worldSpace=True, pivot=list(self.pivot)[:3])
+                return
+            # Maya's pivot flag turns objects in place; Blender's median point also orbits them around it.
+            self._orbit("rotatePivot", lambda offset: offset.rotateBy(quaternion), keep_children)
             _safely(cmds.rotate, math.degrees(rotation.x), math.degrees(rotation.y), math.degrees(rotation.z),
-                    targets, relative=True, worldSpace=True, pivot=list(self.pivot)[:3], **keep_children)
+                    targets, relative=True, worldSpace=True, **keep_children)
         else:
             factor = 1.0 / value if invert else value
             scale = [factor] * 3
             if self.axis is not None:
                 scale = [1.0, 1.0, 1.0]
                 scale[self.axis] = factor
-            _safely(cmds.scale, scale[0], scale[1], scale[2], targets, relative=True, pivot=list(self.pivot)[:3], **keep_children)
+            if self.components:
+                _safely(cmds.scale, scale[0], scale[1], scale[2], targets, relative=True, pivot=list(self.pivot)[:3])
+                return
+            self._orbit("scalePivot", lambda offset: om.MVector(offset.x * scale[0], offset.y * scale[1], offset.z * scale[2]),
+                        keep_children)
+            _safely(cmds.scale, scale[0], scale[1], scale[2], targets, relative=True, **keep_children)
+
+    def _orbit(self, pivot_flag, transform_offset, keep_children):
+        """Move each object so its own pivot lands where the transform around the shared pivot takes it."""
+        center = om.MVector(self.pivot)
+        for target in self.targets:
+            own_pivot = om.MVector(*cmds.xform(target, query=True, worldSpace=True, **{pivot_flag: True}))
+            delta = center + transform_offset(own_pivot - center) - own_pivot
+            if delta.length() > 1e-9:
+                _safely(cmds.move, delta.x, delta.y, delta.z, target, relative=True, worldSpace=True, **keep_children)
 
     def _revert(self):
         if self.applied is not None:
