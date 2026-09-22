@@ -269,11 +269,10 @@ class ModalTransform(object):
 
 
 def _view_ray(view, mouse):
-    result = view.viewToWorld(int(mouse[0]), int(mouse[1]))
-    near, second = result[0], result[1]
-    if isinstance(second, om.MVector):
-        return near, second.normal()
-    return near, (om.MVector(second) - om.MVector(near)).normal()
+    # API 2.0 fills the output point and vector passed in, instead of returning them.
+    source, direction = om.MPoint(), om.MVector()
+    view.viewToWorld(int(mouse[0]), int(mouse[1]), source, direction)
+    return source, direction.normal()
 
 
 def _camera_forward(view):

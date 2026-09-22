@@ -107,6 +107,20 @@ def _bindings():
     ]
 
 
+# Maya's own keys for actions the Blender keys above already cover. Two keys for one action
+# only muddle muscle memory, so they are cleared in this set. (key, modifiers, Blender key that replaces it)
+DUPLICATES_REMOVED = [
+    ("d", CTRL, "Shift+D duplicate"),
+    ("p", {}, "Ctrl+P parent"),
+    ("P", {}, "Alt+P unparent"),
+    ("h", CTRL, "H hide selected"),
+    ("d", ALT, "Alt+A select none"),
+    ("A", CTRL, "A select all"),
+    ("F8", {}, "Tab object / component"),
+    ("f", {}, ". frame selected"),
+]
+
+
 def apply():
     name = config.HOTKEY_SET_NAME
     if cmds.hotkeySet(name, exists=True):
@@ -128,6 +142,12 @@ def apply():
         except Exception as error:
             failures.append("{}{}: {}".format("+".join(m[:-8] for m in modifiers), key, error))
 
+    for key, modifiers, _ in DUPLICATES_REMOVED:
+        try:
+            cmds.hotkey(keyShortcut=key, name="", releaseName="", **modifiers)
+        except Exception as error:
+            failures.append("clearing {}{}: {}".format("+".join(m[:-8] for m in modifiers), key, error))
+
     if failures:
         raise RuntimeError("{} of the hotkeys failed:\n  ".format(len(failures)) + "\n  ".join(failures))
 
@@ -148,4 +168,9 @@ def report():
         bound = cmds.hotkey(key, query=True, name=True, **modifiers)
         lines.append("{:<14} {:<45} {}".format("+".join(m[:-8] for m in modifiers) + (" " if modifiers else "") + key,
                                                str(bound), "OK" if bound == press else "EXPECTED " + press))
+    lines.append("cleared Maya duplicates:")
+    for key, modifiers, replacement in DUPLICATES_REMOVED:
+        bound = cmds.hotkey(key, query=True, name=True, **modifiers)
+        lines.append("{:<14} {:<45} {}".format("+".join(m[:-8] for m in modifiers) + (" " if modifiers else "") + key,
+                                               "(use {})".format(replacement), "OK" if not bound else "STILL " + str(bound)))
     print("\n".join(lines))

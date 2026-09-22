@@ -80,7 +80,9 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 | Ctrl+P | Parent (select child first, parent last) | |
 | Alt+P | Unparent | Camera mode toggle |
 
-W and E keep Maya's manipulator tools when you need them, so Maya tutorials still apply. F still frames the selection. Shift+A adds objects at the origin, sized in centimeters like Blender's defaults in meters (a 1 m bone is 100 cm).
+W keeps Maya's move manipulator for when you want to drag handles. E is extrude on joints and Maya's rotate tool otherwise.
+
+Maya's own keys for actions these keys already cover are cleared in this set, so each action has one key: Ctrl+D (use Shift+D), P and Shift+P (use Ctrl+P and Alt+P), Ctrl+H (use H), Alt+D (use Alt+A), Ctrl+Shift+A (use A), F8 (use Tab) and F (use `.`). Editor-specific keys, like F in the Graph Editor, stay. Shift+A adds objects at the origin, sized in centimeters like Blender's defaults in meters (a 1 m bone is 100 cm).
 
 Alt+G / Alt+R / Alt+S skip locked and driven channels and can be undone in one step. Objects and controls go to 0 (1 for scale). A joint's translate and rotate hold its rest position in Maya, so zeroing them would collapse the joint. Joints go back to their bind pose instead, like a Blender bone to rest. Joints without a bind pose (not skinned) are skipped with a warning. Put controls inside offset groups and Alt+G / Alt+R / Alt+S work on them exactly as in Blender.
 
@@ -249,7 +251,7 @@ If hotkeys don't respond, check which hotkey set is active and what each key is 
 import maya_blender_like.hotkeys as h; h.report()
 ```
 
-Every line should end in `OK`, and the set should be `Blender_Style`. If another set is current (picked in the Hotkey Editor, or created by another script), restart Maya or pick `Blender_Style` in **Windows → Settings/Preferences → Hotkey Editor**.
+Every line should end in `OK`, including the cleared Maya duplicates at the end, and the set should be `Blender_Style`. If another set is current (picked in the Hotkey Editor, or created by another script), restart Maya or pick `Blender_Style` in **Windows → Settings/Preferences → Hotkey Editor**.
 
 Maya saves hotkeys and preferences only when it closes normally. After a crash the saved hotkey file stays old, but the module applies its hotkeys again at every start, so that doesn't matter.
 
