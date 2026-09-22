@@ -15,6 +15,20 @@ CUSTOM_COMMANDS = [
      "import maya_blender_like.transforms as t; t.clear('rotate')"),
     ("MBL_ClearScaleNameCommand", "Clear scale (Blender Alt+S)",
      "import maya_blender_like.transforms as t; t.clear('scale')"),
+    ("MBL_AddMenuNameCommand", "Add menu (Blender Shift+A)",
+     "import maya_blender_like.menus as m; m.add_menu()"),
+    ("MBL_ApplyMenuNameCommand", "Apply menu (Blender Ctrl+A)",
+     "import maya_blender_like.menus as m; m.apply_menu()"),
+    ("MBL_DeleteMenuNameCommand", "Delete menu (Blender X)",
+     "import maya_blender_like.menus as m; m.delete_menu()"),
+    ("MBL_ShowAllNameCommand", "Reveal hidden objects (Blender Alt+H)",
+     "from maya import mel; mel.eval('ShowAll')"),
+    ("MBL_ToggleChannelBoxNameCommand", "Toggle Channel Box (Blender N)",
+     "from maya import mel; mel.eval('ToggleChannelBox')"),
+    ("MBL_ToggleAttributeEditorNameCommand", "Toggle Attribute Editor (Blender Properties)",
+     "from maya import mel; mel.eval('ToggleAttributeEditor')"),
+    ("MBL_ToggleGridSnapNameCommand", "Toggle grid snap (Blender Shift+Tab)",
+     "import maya_blender_like.interface as i; i.toggle_grid_snap()"),
 ]
 
 # (key, modifiers, press command, release command)
@@ -40,6 +54,19 @@ BINDINGS = [
     ("D", {}, "NameComDuplicate_Selected", ""),
     ("p", {"ctrlModifier": True}, "NameComParent_Selected", ""),
     ("p", {"altModifier": True}, "NameComUnparent_Selected", ""),
+    # Shift+A add menu, Ctrl+A apply menu, X delete menu (Delete still deletes directly).
+    ("A", {}, "MBL_AddMenuNameCommand", ""),
+    ("a", {"ctrlModifier": True}, "MBL_ApplyMenuNameCommand", ""),
+    ("x", {}, "MBL_DeleteMenuNameCommand", ""),
+    # H hide selected, Shift+H hide unselected, Alt+H reveal all.
+    ("h", {}, "NameComHide_Selected_Objects", ""),
+    ("H", {}, "NameComHide_Unselected_Objects", ""),
+    ("h", {"altModifier": True}, "MBL_ShowAllNameCommand", ""),
+    # N toggles the Channel Box (Blender's sidebar), Shift+N the Attribute Editor.
+    ("n", {}, "MBL_ToggleChannelBoxNameCommand", ""),
+    ("N", {}, "MBL_ToggleAttributeEditorNameCommand", ""),
+    # Shift+Tab toggles grid snap (it was held X in Maya).
+    ("Tab", {"shiftModifier": True}, "MBL_ToggleGridSnapNameCommand", ""),
 ]
 
 

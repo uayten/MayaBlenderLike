@@ -15,6 +15,8 @@ def startup():
         _run("navigation", lambda: _import("navigation").install())
     if config.ENABLE_GRID:
         _run("grid", lambda: _import("grid").apply())
+    if config.ENABLE_LAYOUT or config.ENABLE_COLORS:
+        _run("interface", lambda: _import("interface").apply())
 
 
 def _import(name):
