@@ -111,7 +111,7 @@ With the mouse over a viewport and something selected, G, R and S work as in Ble
 | Input | Effect |
 |---|---|
 | Move the mouse | Move in the view plane, rotate around the view axis, or scale from the pivot |
-| X / Y / Z | Lock to the global axis; press again for the local axis (of the active object), again to unlock. A line through the pivot, in Maya's axis color, shows the locked axis. Switching axis discards what the previous axis did |
+| X / Y / Z | Lock to the global axis; press again for the local axis (of the active object), again to unlock. Global axes are Blender's: **Z is up** and Y runs back to front (Maya's Y and -Z, as FBX converts them), so G Z moves up in a Y-up Maya; `BLENDER_AXES = False` in config.py uses Maya's names. Local axes are the object's or bone's own, the same as in Blender. A line through the pivot, in Maya's color for the axis it runs along, shows the locked axis. Switching axis discards what the previous axis did |
 | Digits, `.`, `-`, Backspace | Type an exact value: cm for move (X when no axis is locked), degrees for rotate, factor for scale |
 | G / R / S | Switch to another transform without confirming |
 | Left click / Enter | Confirm, as one undo step |
@@ -392,6 +392,7 @@ ENABLE_NUMPAD_VIEWS = True
 NUMPAD_AUTO_PERSPECTIVE = True
 
 ENABLE_MODAL_TRANSFORMS = True
+BLENDER_AXES = True        # G / R / S: Z is up, as in Blender
 ENABLE_MODE_INDICATOR = True
 ENABLE_ARMATURE_MODES = True
 ENABLE_LAYOUT = True

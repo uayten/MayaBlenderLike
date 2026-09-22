@@ -25,7 +25,7 @@ except ImportError:  # Maya 2024 and older ship PySide2
     from PySide2 import QtCore, QtGui, QtWidgets
     from shiboken2 import wrapInstance
 
-from . import drivers, modes
+from . import config, drivers, modes
 
 Qt = QtCore.Qt
 
@@ -33,6 +33,9 @@ TRANSLATE, ROTATE, SCALE = "translate", "rotate", "scale"
 MODE_KEYS = {Qt.Key_G: TRANSLATE, Qt.Key_R: ROTATE, Qt.Key_S: SCALE}
 AXIS_KEYS = {Qt.Key_X: 0, Qt.Key_Y: 1, Qt.Key_Z: 2}
 WORLD_AXES = (om.MVector(1, 0, 0), om.MVector(0, 1, 0), om.MVector(0, 0, 1))
+# Blender's global X / Y / Z in Maya, after FBX's axis conversion: Blender's up (Z) is Maya's Y,
+# and Blender's +Y (towards the back) is Maya's -Z. Objects and bones keep their local axes.
+BLENDER_WORLD_AXES = (om.MVector(1, 0, 0), om.MVector(0, 0, -1), om.MVector(0, 1, 0))
 TYPED_CHARACTERS = "0123456789.-"
 MIN_SCALE = 1e-4
 # Axis line: Maya's X/Y/Z axis display colors, with its defaults when they can't be read.
@@ -274,7 +277,9 @@ class ModalTransform(object):
         shape = cmds.listRelatives(self.axis_line, shapes=True, fullPath=True)[0]
         cmds.setAttr(shape + ".overrideEnabled", True)
         cmds.setAttr(shape + ".overrideRGBColors", True)
-        cmds.setAttr(shape + ".overrideColorRGB", *_axis_color(self.axis))
+        # Maya's color for the world axis the line runs along (Blender's Z key draws Maya's green Y).
+        color_axis = self.axis if self.local else max(range(3), key=lambda i: abs(direction[i]))
+        cmds.setAttr(shape + ".overrideColorRGB", *_axis_color(color_axis))
         cmds.setAttr(shape + ".lineWidth", AXIS_LINE_WIDTH)
         cmds.setAttr(shape + ".alwaysDrawOnTop", True)
         cmds.setAttr(self.axis_line + ".hiddenInOutliner", True)
@@ -290,7 +295,7 @@ class ModalTransform(object):
         if self.axis is None:
             return None
         if not self.local:
-            return WORLD_AXES[self.axis]
+            return (BLENDER_WORLD_AXES if config.BLENDER_AXES else WORLD_AXES)[self.axis]
         matrix = om.MMatrix(cmds.xform(_owner(self.targets[-1]), query=True, worldSpace=True, matrix=True))
         row = om.MVector(matrix.getElement(self.axis, 0), matrix.getElement(self.axis, 1), matrix.getElement(self.axis, 2))
         return row.normal()

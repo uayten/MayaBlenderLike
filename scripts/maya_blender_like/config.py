@@ -17,6 +17,9 @@ NUMPAD_AUTO_PERSPECTIVE = True     # like Blender: numpad views go orthographic,
 # Modal G / R / S over a viewport (X/Y/Z axis, typed values, click to confirm) and E to extrude joints.
 # Off: G / R / S just pick Maya's move, rotate and scale tools.
 ENABLE_MODAL_TRANSFORMS = True
+# X / Y / Z in G / R / S name Blender's global axes: Z is up, Y is back to front (Maya's Y and -Z,
+# through the FBX axis conversion). False: Maya's own axes (Y up). Local axes are the same either way.
+BLENDER_AXES = True
 
 # Label in the viewport's top-left corner: Object Mode, Pose Mode, Edit Mode - Armature / Mesh.
 ENABLE_MODE_INDICATOR = True
