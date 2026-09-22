@@ -89,10 +89,17 @@ def _add_unguarded(owner, kind, target):
 
 
 def _guarded(action):
+    # Building a stack creates groups, and Maya selects each new group: give the selection back,
+    # so the owner stays selected (and pose mode doesn't clear a group it can't select).
+    selection = cmds.ls(selection=True, long=True) or []
     try:
         action()
     except Exception as error:  # show the problem in Maya instead of losing it in the Qt callback
         cmds.warning("MayaBlenderLike constraints: {}".format(error))
+    finally:
+        kept = [node for node in selection if cmds.objExists(node)]
+        if kept != (cmds.ls(selection=True, long=True) or []):
+            cmds.select(kept, replace=True) if kept else cmds.select(clear=True)
 
 
 class ConstraintsPanel(QtWidgets.QWidget):
