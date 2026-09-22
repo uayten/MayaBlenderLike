@@ -3,6 +3,7 @@
 Makes Autodesk Maya feel like Blender, installed in one step and restored in one step after reinstalling Maya:
 
 - **Viewport navigation without Alt**: middle mouse orbits, Shift + middle pans, Ctrl + middle dollies
+- **Numpad views**: 1 / 3 / 7 for front, right and top in orthographic, Ctrl for the opposite side, 5 to toggle orthographic and perspective
 - **Blender hotkeys**: G / R / S to move, rotate, scale, Tab for components, A to select all, Shift+D to duplicate, Ctrl+P to parent, and more
 - **A usable grid**: 10 m wide with 1 m major lines, instead of Maya's 24 cm default
 - **Nothing hard-coded into Maya**: everything lives in this folder as a Maya module and can be switched off in one file
@@ -13,6 +14,7 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 - [Uninstall](#uninstall)
 - [Hotkeys](#hotkeys)
 - [Viewport navigation](#viewport-navigation)
+- [Numpad views](#numpad-views)
 - [Grid](#grid)
 - [Configuration](#configuration)
 - [How it works](#how-it-works)
@@ -73,6 +75,26 @@ The transform tools aren't modal like Blender's: the key picks the tool and you 
 
 Alt + mouse keeps working as in stock Maya. Speeds and dolly direction are set in the configuration file. Maya's own middle-drag, which moves the selected object from anywhere in the viewport, isn't available while this feature is on.
 
+## Numpad views
+
+Press the keys with the mouse over a viewport, as in Blender.
+
+| Key | View |
+|---|---|
+| Numpad 1 | Front (orthographic) |
+| Ctrl + Numpad 1 | Back |
+| Numpad 3 | Right |
+| Ctrl + Numpad 3 | Left |
+| Numpad 7 | Top |
+| Ctrl + Numpad 7 | Bottom |
+| Numpad 5 | Toggle orthographic / perspective, keeping the framing |
+
+Like Blender's Auto Perspective, a view that went orthographic through 1, 3 or 7 returns to perspective when you orbit. A view made orthographic with 5 stays orthographic while orbiting.
+
+The views move the viewport's own camera around the current view center. Maya's front, side and top cameras are untouched. Views follow Blender's axes after an FBX export: Blender's front arrives in Maya facing +Z, which is Maya's front.
+
+Maya's hotkeys can't tell the numpad from the number row, so the numpad is handled by the navigation filter. The number row keeps its Maya hotkeys (1 / 2 / 3 smoothness, 4 / 5 / 6 / 7 display modes). The numpad works with Num Lock on or off, and it's ignored while typing in a text field.
+
 ## Grid
 
 The viewport grid spans 10 m (−5 m to +5 m), with a major line every 1 m and a minor line every 10 cm. The module applies it at startup and again after **File → New** and **File → Open**.
@@ -92,6 +114,9 @@ NAVIGATION_ORBIT_DEGREES_PER_PIXEL = 0.4
 NAVIGATION_DOLLY_SPEED = 0.005
 NAVIGATION_INVERT_DOLLY = False
 
+ENABLE_NUMPAD_VIEWS = True
+NUMPAD_AUTO_PERSPECTIVE = True
+
 ENABLE_GRID = True
 GRID_HALF_SIZE_CM = 500
 GRID_SPACING_CM = 100
@@ -105,7 +130,7 @@ To add or change a hotkey, edit the `BINDINGS` list in `scripts/maya_blender_lik
 - `install.bat` registers the folder as a Maya module (a `.mod` file), which adds `scripts/` to Maya's Python path.
 - Maya runs every `userSetup.py` found on its Python path at startup. The module's `scripts/userSetup.py` calls `maya_blender_like.startup()` once the UI is ready.
 - Each feature is applied on its own. If one fails, the others still load, and the failure shows as a warning in the Script Editor.
-- Viewport navigation is a Qt event filter that catches middle-mouse drags over model panels and moves the panel camera with Maya's `tumble`, `track` and `dolly` commands.
+- Viewport navigation is a Qt event filter that catches middle-mouse drags over model panels and moves the panel camera with Maya's `tumble`, `track` and `dolly` commands. The same filter catches numpad keys over viewports.
 
 ## Compatibility
 
