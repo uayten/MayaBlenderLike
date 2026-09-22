@@ -10,6 +10,10 @@ NAVIGATION_ORBIT_DEGREES_PER_PIXEL = 0.4
 NAVIGATION_DOLLY_SPEED = 0.005     # zoom per pixel of vertical drag
 NAVIGATION_INVERT_DOLLY = False    # False: drag up zooms in
 
+# Numpad views over a viewport: 1/3/7 front/right/top, Ctrl for the opposite side, 5 toggles orthographic.
+ENABLE_NUMPAD_VIEWS = True
+NUMPAD_AUTO_PERSPECTIVE = True     # like Blender: numpad views go orthographic, orbiting goes back to perspective
+
 # Viewport grid, in centimeters (Maya's default working unit).
 ENABLE_GRID = True
 GRID_HALF_SIZE_CM = 500   # grid spans -5 m to +5 m
