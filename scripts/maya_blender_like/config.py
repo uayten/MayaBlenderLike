@@ -6,6 +6,9 @@ HOTKEY_SET_NAME = "Blender_Style"
 
 # Viewport navigation: middle mouse orbits, Shift+middle pans, Ctrl+middle dollies, no Alt needed.
 ENABLE_NAVIGATION = True
+NAVIGATION_ORBIT_DEGREES_PER_PIXEL = 0.4
+NAVIGATION_DOLLY_SPEED = 0.005     # zoom per pixel of vertical drag
+NAVIGATION_INVERT_DOLLY = False    # False: drag up zooms in
 
 # Viewport grid, in centimeters (Maya's default working unit).
 ENABLE_GRID = True

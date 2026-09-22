@@ -64,14 +64,14 @@ The transform tools aren't modal like Blender's: the key picks the tool and you 
 
 ## Viewport navigation
 
-| Blender gesture | Sent to Maya as | Result |
+| Blender gesture | Maya camera command | Result |
 |---|---|---|
-| Middle mouse | Alt + left mouse | Orbit |
-| Shift + middle mouse | Alt + middle mouse | Pan |
-| Ctrl + middle mouse | Alt + right mouse | Dolly |
+| Middle mouse | tumble | Orbit |
+| Shift + middle mouse | track | Pan |
+| Ctrl + middle mouse | dolly | Dolly (drag up to zoom in) |
 | Mouse wheel | unchanged | Zoom |
 
-Alt + mouse keeps working as in stock Maya. Maya's own middle-drag, which moves the selected object from anywhere in the viewport, isn't available while this feature is on.
+Alt + mouse keeps working as in stock Maya. Speeds and dolly direction are set in the configuration file. Maya's own middle-drag, which moves the selected object from anywhere in the viewport, isn't available while this feature is on.
 
 ## Grid
 
@@ -102,7 +102,7 @@ To add or change a hotkey, edit the `BINDINGS` list in `scripts/maya_blender_lik
 - `install.bat` registers the folder as a Maya module (a `.mod` file), which adds `scripts/` to Maya's Python path.
 - Maya runs every `userSetup.py` found on its Python path at startup. The module's `scripts/userSetup.py` calls `maya_blender_like.startup()` once the UI is ready.
 - Each feature is applied on its own. If one fails, the others still load, and the failure shows as a warning in the Script Editor.
-- Viewport navigation is a Qt event filter that rewrites middle-mouse events over model panels into the matching Alt gesture.
+- Viewport navigation is a Qt event filter that catches middle-mouse drags over model panels and moves the panel camera with Maya's `tumble`, `track` and `dolly` commands.
 
 ## Compatibility
 
