@@ -70,7 +70,7 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 | Shift+Tab | Toggle grid snap | |
 | I | Set key | Insert key modifier |
 | Shift+R | Repeat last command | |
-| Tab | Edit mode with joints selected ([details](#edit-mode-and-pose-mode)); object / component toggle otherwise (F8 still works) | |
+| Tab | Edit mode with joints selected ([details](#edit-mode-and-pose-mode)); object / component toggle otherwise | F8 (cleared) |
 | Ctrl+Tab | Leave edit mode to pose mode | |
 | Shift+Ctrl+C | Add Constraint (with Targets) menu ([details](#constraints-panel)) | Create camera from view |
 | A | Select all | Frame all (moved to Home) |
@@ -84,7 +84,7 @@ W keeps Maya's move manipulator for when you want to drag handles. E is extrude 
 
 Maya's own keys for actions these keys already cover are cleared in this set, so each action has one key: Ctrl+D (use Shift+D), P and Shift+P (use Ctrl+P and Alt+P), Ctrl+H (use H), Alt+D (use Alt+A), Ctrl+Shift+A (use A), F8 (use Tab) and F (use `.`). Editor-specific keys, like F in the Graph Editor, stay. Shift+A adds objects at the origin, sized in centimeters like Blender's defaults in meters (a 1 m bone is 100 cm).
 
-Alt+G / Alt+R / Alt+S skip locked and driven channels and can be undone in one step. Objects and controls go to 0 (1 for scale). A joint's translate and rotate hold its rest position in Maya, so zeroing them would collapse the joint. Joints go back to their bind pose instead, like a Blender bone to rest. Joints without a bind pose (not skinned) are skipped with a warning. Put controls inside offset groups and Alt+G / Alt+R / Alt+S work on them exactly as in Blender.
+Alt+G / Alt+R / Alt+S skip locked and driven channels and can be undone in one step. Objects and controls go to 0 (1 for scale). A joint's translate and rotate hold its rest position in Maya, so zeroing them would collapse the joint. Joints go back to their rest instead, like a Blender bone: the rest recorded by [edit mode](#edit-mode-and-pose-mode), or the skin's bind pose before the first edit. Joints with neither are skipped with a warning. Put controls inside offset groups and Alt+G / Alt+R / Alt+S work on them exactly as in Blender.
 
 ## Modal transforms
 
