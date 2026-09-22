@@ -29,6 +29,12 @@ CUSTOM_COMMANDS = [
      "from maya import mel; mel.eval('ToggleAttributeEditor')"),
     ("MBL_ToggleGridSnapNameCommand", "Toggle grid snap (Blender Shift+Tab)",
      "import maya_blender_like.interface as i; i.toggle_grid_snap()"),
+    ("MBL_TabNameCommand", "Edit mode on joints, object/component toggle otherwise (Blender Tab)",
+     "import maya_blender_like.modes as m; m.tab()"),
+    ("MBL_CtrlTabNameCommand", "Leave edit mode to pose mode (Blender Ctrl+Tab)",
+     "import maya_blender_like.modes as m; m.ctrl_tab()"),
+    ("MBL_AddConstraintNameCommand", "Add Constraint with Targets (Blender Shift+Ctrl+C)",
+     "import maya_blender_like.constraints_panel as p; p.add_constraint_menu()"),
 ]
 
 # (key, modifiers, press command, release command)
@@ -44,8 +50,9 @@ BINDINGS = [
     # Set Key moves from S to I; Repeat Last moves from G to Shift+R.
     ("i", {}, "NameComSet_Keyframe", ""),
     ("R", {}, "NameComRepeat_Last_Menu_Action", ""),
-    # Tab toggles object/component mode (F8 keeps working).
-    ("Tab", {}, "NameComToggle_ObjectComponent_Editing", ""),
+    # Tab: edit mode with joints selected, object/component toggle otherwise (F8 keeps working). Ctrl+Tab: pose mode.
+    ("Tab", {}, "MBL_TabNameCommand", ""),
+    ("Tab", {"ctrlModifier": True}, "MBL_CtrlTabNameCommand", ""),
     # A select all, Alt+A deselect, Home frame all.
     ("a", {}, "NameComSelect_All", ""),
     ("a", {"altModifier": True}, "NameComSelectNone", ""),
@@ -65,6 +72,8 @@ BINDINGS = [
     # N toggles the Channel Box (Blender's sidebar), Shift+N the Attribute Editor.
     ("n", {}, "MBL_ToggleChannelBoxNameCommand", ""),
     ("N", {}, "MBL_ToggleAttributeEditorNameCommand", ""),
+    # Shift+Ctrl+C: Add Constraint (with Targets): the active object is the last selected, the other is the target.
+    ("C", {"ctrlModifier": True}, "MBL_AddConstraintNameCommand", ""),
     # Shift+Tab toggles grid snap (it was held X in Maya).
     ("Tab", {"shiftModifier": True}, "MBL_ToggleGridSnapNameCommand", ""),
 ]

@@ -24,6 +24,8 @@ except ImportError:  # Maya 2024 and older ship PySide2
     from PySide2 import QtCore, QtGui, QtWidgets
     from shiboken2 import wrapInstance
 
+from . import modes
+
 Qt = QtCore.Qt
 
 TRANSLATE, ROTATE, SCALE = "translate", "rotate", "scale"
@@ -54,6 +56,7 @@ class ModalTransform(object):
             self.finished = True
             return
         self.pivot = _pivot(self.targets, self.components)
+        self.edit_mode = modes.is_editing() and not self.components
         self.view_forward = _camera_forward(self.view)
         self.axis = None           # 0, 1, 2 or None
         self.local = False
@@ -169,21 +172,23 @@ class ModalTransform(object):
 
     def _apply(self, value, invert=False):
         targets = self.targets
+        # In edit mode, moving a joint leaves its children where they are, as with Blender's edit bones.
+        keep_children = {"preserveChildPosition": True} if self.edit_mode else {}
         if self.mode == TRANSLATE:
             vector = -value if invert else value
-            _safely(cmds.move, vector.x, vector.y, vector.z, targets, relative=True, worldSpace=True)
+            _safely(cmds.move, vector.x, vector.y, vector.z, targets, relative=True, worldSpace=True, **keep_children)
         elif self.mode == ROTATE:
             angle = -value if invert else value
             rotation = om.MQuaternion(math.radians(angle), self._rotation_axis()).asEulerRotation()
             _safely(cmds.rotate, math.degrees(rotation.x), math.degrees(rotation.y), math.degrees(rotation.z),
-                    targets, relative=True, worldSpace=True, pivot=list(self.pivot)[:3])
+                    targets, relative=True, worldSpace=True, pivot=list(self.pivot)[:3], **keep_children)
         else:
             factor = 1.0 / value if invert else value
             scale = [factor] * 3
             if self.axis is not None:
                 scale = [1.0, 1.0, 1.0]
                 scale[self.axis] = factor
-            _safely(cmds.scale, scale[0], scale[1], scale[2], targets, relative=True, pivot=list(self.pivot)[:3])
+            _safely(cmds.scale, scale[0], scale[1], scale[2], targets, relative=True, pivot=list(self.pivot)[:3], **keep_children)
 
     def _revert(self):
         if self.applied is not None:

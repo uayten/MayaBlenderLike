@@ -4,6 +4,8 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 
 - **Viewport navigation without Alt**: middle mouse orbits, Shift + middle pans, Ctrl + middle dollies
 - **Numpad views**: 1 / 3 / 7 for front, right and top in orthographic, Ctrl for the opposite side, 5 to toggle orthographic and perspective, `.` to frame the selection
+- **Edit mode and pose mode for skeletons**: Tab on joints edits the rest with the mesh standing still, then rebinds the skin; Alt+G / Alt+R / Alt+S return to that rest
+- **Constraints panel with Blender's stack**: Blender constraint names, top-to-bottom order, influence, Apply, built from standard Maya nodes
 - **Modal transforms**: G / R / S follow the mouse, X / Y / Z lock an axis, type a value, click to confirm, right-click to cancel; E extrudes joints like bones
 - **Blender hotkeys and menus**: Shift+A add, Ctrl+A apply, X delete, H / Shift+H / Alt+H hide and reveal, Alt+G / Alt+R / Alt+S clear transforms, Tab for components, A to select all, Shift+D to duplicate, Ctrl+P to parent, N for the sidebar, and more
 - **Blender look**: Outliner on the right above the Channel Box, gray viewport, orange active selection
@@ -16,6 +18,8 @@ Makes Autodesk Maya feel like Blender, installed in one step and restored in one
 - [Uninstall](#uninstall)
 - [Hotkeys](#hotkeys)
 - [Modal transforms](#modal-transforms)
+- [Edit mode and pose mode](#edit-mode-and-pose-mode)
+- [Constraints panel](#constraints-panel)
 - [Viewport navigation](#viewport-navigation)
 - [Numpad views](#numpad-views)
 - [Layout and colors](#layout-and-colors)
@@ -65,7 +69,9 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 | Shift+Tab | Toggle grid snap | |
 | I | Set key | Insert key modifier |
 | Shift+R | Repeat last command | |
-| Tab | Toggle object / component mode (F8 still works) | |
+| Tab | Edit mode with joints selected ([details](#edit-mode-and-pose-mode)); object / component toggle otherwise (F8 still works) | |
+| Ctrl+Tab | Leave edit mode to pose mode | |
+| Shift+Ctrl+C | Add Constraint (with Targets) menu ([details](#constraints-panel)) | Create camera from view |
 | A | Select all | Frame all (moved to Home) |
 | Alt+A | Select none | Cycle display mode |
 | Home | Frame all | |
@@ -93,6 +99,70 @@ With the mouse over a viewport and something selected, G, R and S work as in Ble
 The pivot is the median of the selected origins, or of the selected components in component mode. A child whose parent is also selected moves once, as in Blender. Locked or driven channels are skipped with a warning. The current value shows in the viewport while you drag.
 
 E on selected joints adds a child joint at each one and starts moving it, like extruding a bone. The extrusion and the move are two undo steps.
+
+## Edit mode and pose mode
+
+Maya has no armature modes: a joint's translate and rotate hold both its rest placement and its pose. The module adds Blender's two modes on top of standard joints.
+
+**Edit mode** (Tab with joints selected, for their whole skeleton):
+
+- Joints go to their rest pose and are drawn light blue; the viewport shows **EDIT MODE**.
+- The skin is paused, so the mesh stays still while you move joints, like Blender's edit bones.
+- Moving, rotating or scaling a joint leaves its children in place, with the modal G / R / S and with Maya's own tools.
+- E extrudes new joints.
+
+**Leaving edit mode** (Tab again, or Ctrl+Tab):
+
+- The new placement becomes the rest. Rotation goes into jointOrient, so joints at rest read rotate 0, as Maya riggers expect.
+- The skin is rebound at the new rest: the mesh keeps its shape instead of jumping.
+- The pose you had before comes back on top of the new rest.
+
+**Pose mode** is Maya's normal state. Alt+G / Alt+R / Alt+S return joints to the rest recorded by edit mode (or to the skin's bind pose before the first edit). **Ctrl+A → Pose as Rest Pose** makes the current pose the rest, like Blender's Apply menu.
+
+The rest is stored as three hidden attributes on each joint (`mblRestTranslate`, `mblRestRotate`, `mblRestScale`). The skeleton stays made of standard joints, so other animators, Maya tools and FBX exports to game engines see a normal skeleton.
+
+Limitations:
+
+- Keyframes on joints are absolute in Maya: editing the rest doesn't shift existing keys the way Blender's relative pose channels do. Edit the rest before animating.
+- Undoing across a mode change restores the scene but not the mode display. Press Tab to resync.
+
+An experimental alternative, keeping the rest inside the joint (`offsetParentMatrix`) so channels read 0 at rest exactly like Blender, is planned for testing. It stays out of the default because its compatibility with FBX export and other riggers still has to be verified.
+
+## Constraints panel
+
+**Blender Like → Constraints Panel** docks a panel next to the Attribute Editor, like Blender's Constraints tab. It follows the active object (the last one selected).
+
+- **Add Object Constraint** lists Blender's constraints by name: Copy Location, Copy Rotation, Copy Scale, Copy Transforms, Limit Location, Limit Rotation, Limit Scale, Damped Track, Inverse Kinematics, Locked Track, Stretch To, Track To, Child Of.
+- With a second object selected, it becomes the target, like Blender's Add Constraint (with Targets). Shift+Ctrl+C opens the same menu at the cursor.
+- Each constraint is a card: enable checkbox, move up / down, Apply, delete, target field with a picker (click Pick, then the target in the viewport or Outliner), axes, offset, track and up axes, and influence with a key button.
+
+Maya equivalents under the hood:
+
+| Blender | Maya |
+|---|---|
+| Copy Location / Rotation / Scale | Point / Orient / Scale Constraint |
+| Copy Transforms | Parent + Scale Constraint |
+| Child Of (with Set Inverse) | Parent + Scale Constraint with offset |
+| Damped Track | Aim Constraint without up vector |
+| Track To | Aim Constraint with scene up (Blender's Z up is Maya's Y up) |
+| Locked Track | Aim Constraint with an object-rotation up vector |
+| Stretch To | Aim Constraint plus scale by distance (no volume preservation) |
+| Limit Location / Rotation / Scale | Maya transform limits on the owner's own channels |
+| Inverse Kinematics | ikHandle (Rotate-Plane solver) with point and pole vector constraints |
+
+### The stack
+
+Blender evaluates constraints top to bottom, each blending into the previous result by its influence. Maya constraints have no order, and two on the same channel fight. The panel rebuilds Blender's stack as a chain of plain transforms in a hidden group, `MBL_constraintStacks`, outside the owner's hierarchy. The owner then follows the end of the chain.
+
+- **Other animators**: the stack is built only from standard Maya nodes (groups, constraints, utility nodes). Anyone can open and animate the rig without this module. Influence and enable are keyable attributes on the layer nodes.
+- **Game engines**: nothing changes. No constraint, from Blender or Maya, ever reaches a game engine: bake the animation when exporting FBX. The skeleton hierarchy is untouched, since the chain lives outside it.
+- **Limits and IK** act on the owner itself and don't take part in the order, shown at the bottom as "own channels" and "own chain".
+- **The stack is Blender's model, not Maya's.** A Maya rigger opening the file sees the chain of groups, not a constraint stack. The note at the bottom of the panel says so.
+
+Differences from Blender:
+
+- A constrained owner's channels become outputs of its stack, as with any Maya constraint. Animate a control and constrain the joint to it, which is standard Maya practice, instead of animating the constrained node directly.
+- Constraint spaces are world space. Blender's local and custom spaces aren't offered.
 
 ## Viewport navigation
 
@@ -127,6 +197,8 @@ The views move the viewport's own camera around the current view center. Maya's 
 Maya's hotkeys can't tell the numpad from the number row, so the numpad is handled by the navigation filter. The number row keeps its Maya hotkeys (1 / 2 / 3 smoothness, 4 / 5 / 6 / 7 display modes). The numpad works with Num Lock on or off, and it's ignored while typing in a text field.
 
 ## Layout and colors
+
+A **Blender Like** menu in Maya's main menu bar opens the Constraints panel, toggles edit mode, applies Pose as Rest Pose and links to this page.
 
 The first start creates a workspace named **Blender Like**, with the Outliner docked on the right above the Channel Box and Attribute Editor, like Blender's Outliner above Properties. After that the workspace is yours: rearrange it and save it from the workspace menu at the top right of Maya, and the module won't overwrite it. To rebuild it, delete the workspace in Maya and restart.
 

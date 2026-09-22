@@ -36,6 +36,30 @@ def toggle_grid_snap():
     cmds.headsUpMessage("Grid snap " + ("on" if enabled else "off"), time=1.0)
 
 
+MENU_NAME = "MBL_MainMenu"
+
+
+def create_main_menu():
+    """A "Blender Like" menu in Maya's main menu bar with the module's panels and actions."""
+    if cmds.menu(MENU_NAME, exists=True):
+        cmds.deleteUI(MENU_NAME)
+    cmds.menu(MENU_NAME, parent="MayaWindow", label="Blender Like", tearOff=True)
+    items = [
+        ("Constraints Panel", "import maya_blender_like.constraints_panel as p; p.show()"),
+        ("Add Constraint (with Targets)   Shift+Ctrl+C", "import maya_blender_like.constraints_panel as p; p.add_constraint_menu()"),
+        None,
+        ("Toggle Edit Mode   Tab", "import maya_blender_like.modes as m; m.tab()"),
+        ("Pose as Rest Pose", "import maya_blender_like.menus as m; m._pose_as_rest()"),
+        None,
+        ("Hotkeys and Help (README)", "import webbrowser; webbrowser.open('https://github.com/uayten/MayaBlenderLike#contents')"),
+    ]
+    for item in items:
+        if item is None:
+            cmds.menuItem(divider=True, parent=MENU_NAME)
+        else:
+            cmds.menuItem(label=item[0], command=item[1], sourceType="python", parent=MENU_NAME)
+
+
 def apply():
     if config.ENABLE_LAYOUT:
         apply_layout()

@@ -1,6 +1,8 @@
 """Blender's Alt+G / Alt+R / Alt+S: clear location, rotation or scale of the selection."""
 from maya import cmds
 
+from . import rest
+
 RESET_VALUES = {"translate": 0.0, "rotate": 0.0, "scale": 1.0}
 CHANNELS = ("translate", "rotate", "scale")
 
@@ -9,8 +11,8 @@ def clear(channel):
     """Reset translate, rotate or scale on the selection, skipping locked or driven channels.
 
     Objects and controls go to 0 (1 for scale). A joint's translate and rotate hold its rest
-    position, so joints go back to their bind pose instead, like a Blender bone to rest.
-    Joints without a bind pose (not skinned) are skipped with a warning.
+    position, so joints go back to their rest instead, like a Blender bone: the rest stored by
+    edit mode, or the skin's bind pose. Joints with neither are skipped with a warning.
     """
     nodes = cmds.ls(selection=True, transforms=True, long=True) or []
     if not nodes:
@@ -29,14 +31,19 @@ def clear(channel):
         cmds.undoInfo(closeChunk=True)
 
     if unbound:
-        cmds.warning("Clear {}: no bind pose for {}; joints without skin have no stored rest. "
-                     "Animate controls with offset groups instead.".format(channel, ", ".join(_short(j) for j in unbound)))
+        cmds.warning("Clear {}: no rest for {}. Enter and leave edit mode (Tab) once to record it.".format(
+            channel, ", ".join(_short(j) for j in unbound)))
 
 
 def _bind_pose_values(joints, channel):
-    """Bind-pose values of one channel per joint, read by restoring the pose and then undoing the restore by hand."""
+    """Rest values of one channel per joint: the rest stored by edit mode, else the skin's bind pose."""
     rest_values, unbound = {}, []
     for joint in joints:
+        stored = rest.values(joint, channel)
+        if stored is not None:
+            rest_values[joint] = stored
+            continue
+        # No stored rest: read the bind pose by restoring it and then undoing the restore by hand.
         poses = cmds.dagPose(joint, query=True, bindPose=True) or []
         if not poses:
             unbound.append(joint)

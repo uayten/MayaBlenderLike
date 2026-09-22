@@ -17,6 +17,7 @@ def startup():
         _run("grid", lambda: _import("grid").apply())
     if config.ENABLE_LAYOUT or config.ENABLE_COLORS:
         _run("interface", lambda: _import("interface").apply())
+    _run("menu", lambda: _import("interface").create_main_menu())
 
 
 def _import(name):

@@ -109,6 +109,13 @@ def _freeze(translate=False, rotate=False, scale=False):
         cmds.makeIdentity(nodes, apply=True, translate=translate, rotate=rotate, scale=scale)
 
 
+def _pose_as_rest():
+    from . import modes
+    joints = cmds.ls(selection=True, type="joint", long=True)
+    if joints:
+        modes.apply_pose_as_rest(joints)
+
+
 def apply_menu():
     _popup("Apply", [
         ("Location", lambda: _freeze(translate=True)),
@@ -116,6 +123,8 @@ def apply_menu():
         ("Scale", lambda: _freeze(scale=True)),
         ("All Transforms", lambda: _freeze(translate=True, rotate=True, scale=True)),
         ("Rotation & Scale", lambda: _freeze(rotate=True, scale=True)),
+        None,
+        ("Pose as Rest Pose (joints)", _pose_as_rest),
         None,
         ("Origin to Geometry (Center Pivot)", lambda: mel.eval("CenterPivot")),
         ("Reset Transforms (Maya)", lambda: mel.eval("ResetTransformations")),
