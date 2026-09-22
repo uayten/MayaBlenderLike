@@ -421,13 +421,15 @@ FALLBACK_TOOLS = {TRANSLATE: "moveSuperContext", ROTATE: "RotateSuperContext", S
 def start(mode, extrude=False):
     """Hotkey entry point: start a modal transform over the viewport under the mouse.
 
-    Outside a viewport, with nothing selected, or (for E) without joints selected, picks Maya's
-    move / rotate / scale tool instead, so the key still does something sensible.
+    With nothing selected it does nothing, as in Blender. Outside a viewport, or (for E) without
+    joints selected, picks Maya's move / rotate / scale tool instead.
     """
     from . import navigation
-    panel = cmds.getPanel(underPointer=True)
     selection = cmds.ls(selection=True) or []
-    usable = bool(panel and cmds.getPanel(typeOf=panel) == "modelPanel" and selection and navigation.is_installed())
+    if not selection:
+        return
+    panel = cmds.getPanel(underPointer=True)
+    usable = bool(panel and cmds.getPanel(typeOf=panel) == "modelPanel" and navigation.is_installed())
     if extrude:
         usable = usable and all(cmds.nodeType(s) == "joint" for s in selection)
     if not usable:

@@ -62,7 +62,7 @@ The hotkeys live in their own hotkey set, `Blender_Style`, copied from `Maya_Def
 
 | Key | Action | Maya default it replaces |
 |---|---|---|
-| G / R / S | Modal move / rotate / scale over a viewport ([details](#modal-transforms)); Maya's tools elsewhere or with nothing selected | Repeat last (moved to Shift+R), scale tool, set key (moved to I) |
+| G / R / S | Modal move / rotate / scale over a viewport ([details](#modal-transforms)); Maya's tools outside viewports; nothing with nothing selected | Repeat last (moved to Shift+R), scale tool, set key (moved to I) |
 | E | Extrude selected joints ([details](#modal-transforms)); Maya's rotate tool otherwise | |
 | Alt+G / Alt+R / Alt+S | Clear location / rotation / scale | HumanIK full body key (Alt+S) |
 | Shift+A | Add menu: mesh, curve, empty, armature, camera, light | Frame all in all views |
