@@ -182,7 +182,7 @@ FBX carries the skeleton and the skin, not the rig. The Blender add-on in this r
 | Bone collections | Selection sets, see [Bone collections](#bone-collections); hidden collections hidden |
 | Custom shape (with its translation, rotation, scale and Scale to Bone Length) | The shape's wire as curves on the control, in the bone color |
 | Copy Location / Rotation / Scale / Transforms, Child Of, Damped Track, Track To, Locked Track, Stretch To | The same constraint in the control's [stack](#the-stack), in Blender's order, with influence, mute, axes, offset and track / lock / up axes |
-| Limit Location / Rotation / Scale | Maya transform limits on the control |
+| Limit Location / Rotation / Scale | Below every other constraint: Maya transform limits on the control. Higher up, muted or with influence below 1: a layer in the stack, in Blender's order |
 | Inverse Kinematics | [IK on the control](#convert-to-a-mayablenderlike-rig), with target, pole and chain length |
 
 Bones are matched by name (`MCH-arm.L` in Blender is `MCH_arm_L` after FBX). Anything without a Maya match is listed as a warning in the Script Editor: other constraint types, non-World spaces, Head/Tail, pole angle, inverted axes.
@@ -214,7 +214,7 @@ Maya equivalents under the hood:
 | Track To | Aim Constraint with scene up (Blender's Z up is Maya's Y up) |
 | Locked Track | Aim Constraint with an object-rotation up vector |
 | Stretch To | Aim Constraint plus scale by distance (no volume preservation) |
-| Limit Location / Rotation / Scale | Maya transform limits on the owner's own channels |
+| Limit Location / Rotation / Scale | At the bottom: Maya transform limits on the owner's own channels. Moved up: a stack layer that clamps the owner's local values at that point |
 | Inverse Kinematics | ikHandle (Rotate-Plane solver) with point and pole vector constraints |
 
 ### The stack
@@ -223,7 +223,8 @@ Blender evaluates constraints top to bottom, each blending into the previous res
 
 - **Other animators**: the stack is built only from standard Maya nodes (groups, constraints, utility nodes). Anyone can open and animate the rig without this module. Influence and enable are keyable attributes on the layer nodes.
 - **Game engines**: nothing changes. No constraint, from Blender or Maya, ever reaches a game engine: bake the animation when exporting FBX. The skeleton hierarchy is untouched, since the chain lives outside it.
-- **Limits and IK** act on the owner itself and don't take part in the order, shown at the bottom as "own channels" and "own chain".
+- **Limits** at the bottom are Maya's own transform limits ("own channels"): they clamp after the whole stack, and the animator feels them in the channel box. Move a limit up and it becomes a stack layer that clamps at that point, like Blender's Copy Location → Limit Location → Copy Rotation; move it back down past the last constraint and it returns to the owner's channels. A second limit of a kind the channels already hold is added to the stack.
+- **IK** acts on the owner itself and doesn't take part in the order, shown at the bottom as "own chain".
 - **The stack is Blender's model, not Maya's.** A Maya rigger opening the file sees the chain of groups, not a constraint stack. The note at the bottom of the panel says so.
 
 Differences from Blender:

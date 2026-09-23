@@ -158,13 +158,27 @@ def _constraints(owner, bone, rig, notes):
             if spec:
                 items.append(spec)
         elif kind in LIMIT_TYPES:
-            _limit(owner, constraint, rig, label, notes)
+            items.append(_limit_spec(owner, constraint, rig, label, notes))
         elif kind == "IK":
             _ik(owner, constraint, rig, label, notes)
         else:
             notes.append(label + ": no Maya match yet, skipped")
+    # Limits below every other constraint clamp last, which is what Maya's own transform limits
+    # do: those become native limits (the animator feels them in the channel box). Limits
+    # higher up stay stack layers, so they clamp at their place in Blender's order.
+    while items and _fits_own_channels(owner, items[-1]):
+        spec = items.pop()
+        for index, (use_min, minimum, use_max, maximum) in enumerate(spec["limits"]):
+            if use_min or use_max:
+                owner_constraints.set_limit(owner, spec["type"], index, use_min, minimum, use_max, maximum)
     if items:
         stack.build(owner, stack.specs(owner) + items)
+
+
+def _fits_own_channels(owner, spec):
+    """Native limits have no influence or mute, and hold one limit per kind."""
+    return (spec["type"] in LIMIT_TYPES and spec["enabled"] and spec["influence"] >= 0.999
+            and not owner_constraints.has_limits(owner, spec["type"]))
 
 
 def _stack_spec(constraint, rig, label, notes):
@@ -194,10 +208,13 @@ def _stack_spec(constraint, rig, label, notes):
     return spec
 
 
-def _limit(owner, constraint, rig, label, notes):
+def _limit_spec(owner, constraint, rig, label, notes):
     kind = constraint["type"]
     if constraint.get("owner_space", "LOCAL") != "LOCAL":
         notes.append("{}: owner space {} applied as Local".format(label, constraint["owner_space"]))
+    spec = stack.new_spec(kind)
+    spec["influence"] = constraint.get("influence", 1.0)
+    spec["enabled"] = not constraint.get("mute", False)
     for index, axis in enumerate("xyz"):
         if kind == "LIMIT_ROTATION":
             use = constraint.get("use_limit_" + axis, False)
@@ -209,8 +226,8 @@ def _limit(owner, constraint, rig, label, notes):
             if kind == "LIMIT_LOCATION":
                 units = rig.units(owner)
                 low, high = low * units, high * units
-        if use_min or use_max:
-            owner_constraints.set_limit(owner, kind, index, use_min, low, use_max, high)
+        spec["limits"][index] = [use_min, low, use_max, high]
+    return spec
 
 
 def _ik(owner, constraint, rig, label, notes):

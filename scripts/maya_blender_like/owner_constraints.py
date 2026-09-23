@@ -2,6 +2,7 @@
 
 - Limit Location / Rotation / Scale: Maya's transform limits on the owner's own channels,
   which is what Blender limits usually do on controls: keep the animator inside a range.
+  They clamp after the whole stack; moved up, a limit becomes a stack layer (stack.py).
 - Inverse Kinematics: a Maya ikHandle from the owner up its chain, following the target,
   with an optional pole target. On a control of a converted rig, see control_ik.py.
 """
@@ -9,7 +10,7 @@ import functools
 
 from maya import cmds
 
-from . import control_ik, controls
+from . import control_ik, controls, stack
 
 
 def _undoable(function):
@@ -65,6 +66,30 @@ def enable_limits(owner, kind):
     """Blender adds a limit with every axis off; Maya's panel shows it once any axis is on, so start with X."""
     _, minimum, _, maximum = limits(owner, kind)[0]
     set_limit(owner, kind, 0, True, minimum, True, maximum)
+
+
+@_undoable
+def limit_into_stack(owner, kind):
+    """Move a limit up past the last stack constraint: from the owner's channels into a stack layer."""
+    spec = stack.new_spec(kind)
+    spec["limits"] = [list(axis) for axis in limits(owner, kind)]
+    clear_limits(owner, kind)
+    stack.insert(owner, spec, max(len(stack.specs(owner)) - 1, 0))
+
+
+def can_limit_leave_stack(owner, spec):
+    """A limit layer moves down to the owner's channels only from the bottom, and only onto an empty slot."""
+    items = stack.specs(owner)
+    return bool(items) and items[-1]["id"] == spec["id"] and not has_limits(owner, spec["type"])
+
+
+@_undoable
+def limit_out_of_stack(owner, spec_id):
+    """Move the bottom limit layer down: back to Maya's transform limits on the owner's channels."""
+    spec = next(s for s in stack.specs(owner) if s["id"] == spec_id)
+    stack.remove(owner, spec_id)
+    for index, (use_min, minimum, use_max, maximum) in enumerate(spec["limits"]):
+        set_limit(owner, spec["type"], index, use_min, minimum, use_max, maximum)
 
 
 # --- inverse kinematics ---

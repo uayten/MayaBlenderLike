@@ -77,7 +77,9 @@ def _add(owner, kind, target):
 
 
 def _add_unguarded(owner, kind, target):
-    if kind in owner_constraints.LIMIT_CHANNELS:
+    if kind in owner_constraints.LIMIT_CHANNELS and owner_constraints.has_limits(owner, kind):
+        stack.add(owner, kind)  # the owner's channels hold one limit per kind: a second one goes in the stack
+    elif kind in owner_constraints.LIMIT_CHANNELS:
         owner_constraints.enable_limits(owner, kind)
     elif kind == "IK":
         if cmds.nodeType(owner) != "joint" and not controls.is_control(owner):
@@ -278,13 +280,25 @@ class StackCard(Card):
         enabled.setChecked(bool(cmds.getAttr(self.layer + ".enabled")) if self.layer else spec["enabled"])
         enabled.toggled.connect(self._set_enabled)
         self.title_row.insertWidget(0, enabled)
+        kind = spec["type"]
         self.button("^", "Move up", lambda: stack.move(owner, spec_id, -1))
-        self.button("v", "Move down", lambda: stack.move(owner, spec_id, 1))
+        # A limit at the bottom moves down out of the stack, onto the owner's own channels.
+        leaves = kind in stack.LIMIT_CHANNELS and stack.specs(owner)[-1]["id"] == spec_id
+        if leaves:
+            down = self.button("v", "Move down to the owner's own channels (Maya transform limits, after the whole stack)",
+                               lambda: owner_constraints.limit_out_of_stack(owner, spec_id))
+            if not owner_constraints.can_limit_leave_stack(owner, spec):
+                down.setEnabled(False)
+                down.setToolTip("The owner's own channels already have a " + stack.LABELS[kind])
+        else:
+            self.button("v", "Move down", lambda: stack.move(owner, spec_id, 1))
         self.button("Apply", "Keep the current result and remove this constraint", lambda: stack.apply(owner, spec_id))
         self.button("X", "Delete", lambda: stack.remove(owner, spec_id))
 
-        self.object_field("Target", stack.target_name(spec), lambda node: stack.update(owner, spec_id, target=node))
-        kind = spec["type"]
+        if kind in stack.LIMIT_CHANNELS:
+            _limit_rows(self, spec["limits"], self._set_limit)
+        else:
+            self.object_field("Target", stack.target_name(spec), lambda node: stack.update(owner, spec_id, target=node))
         if kind in ("COPY_LOCATION", "COPY_ROTATION", "COPY_SCALE"):
             axes = QtWidgets.QHBoxLayout()
             for index, name in enumerate("XYZ"):
@@ -341,35 +355,50 @@ class StackCard(Card):
         axes[index] = checked
         self.panel.run(lambda: stack.update(self.owner, self.spec["id"], axes=axes))
 
+    def _set_limit(self, index, values):
+        limits = [list(axis) for axis in self.spec["limits"]]
+        limits[index] = list(values)
+        self.panel.run(lambda: stack.update(self.owner, self.spec["id"], limits=limits))
+
 
 class LimitCard(Card):
 
     def __init__(self, panel, owner, kind):
         super(LimitCard, self).__init__(panel, owner, stack.LABELS[kind] + "  (own channels)")
         self.kind = kind
+        up = self.button("^", "Move up into the stack, above its last constraint",
+                         lambda: owner_constraints.limit_into_stack(owner, kind))
+        if not stack.specs(owner):
+            up.setEnabled(False)
+            up.setToolTip("Nothing above to move past")
         self.button("X", "Delete", lambda: owner_constraints.clear_limits(owner, kind))
-        for index, (use_min, minimum, use_max, maximum) in enumerate(owner_constraints.limits(owner, kind)):
-            row = QtWidgets.QHBoxLayout()
-            widgets = []
-            for label, used, value in (("Min", use_min, minimum), ("Max", use_max, maximum)):
-                box = QtWidgets.QCheckBox(label)
-                box.setChecked(used)
-                spin = QtWidgets.QDoubleSpinBox()
-                spin.setRange(-100000.0, 100000.0)
-                spin.setDecimals(3)
-                spin.setValue(value)
-                row.addWidget(box)
-                row.addWidget(spin, 1)
-                widgets.extend([box, spin])
-            for widget in widgets:
-                signal = widget.toggled if isinstance(widget, QtWidgets.QCheckBox) else widget.editingFinished
-                signal.connect(lambda i=index, w=widgets: self._commit(i, w))
-            self.body.addRow("XYZ"[index], row)
+        _limit_rows(self, owner_constraints.limits(owner, kind), self._commit)
 
-    def _commit(self, index, widgets):
-        use_min, minimum, use_max, maximum = (widgets[0].isChecked(), widgets[1].value(),
-                                              widgets[2].isChecked(), widgets[3].value())
-        _guarded(lambda: owner_constraints.set_limit(self.owner, self.kind, index, use_min, minimum, use_max, maximum))
+    def _commit(self, index, values):
+        _guarded(lambda: owner_constraints.set_limit(self.owner, self.kind, index, *values))
+
+
+def _limit_rows(card, limits, on_commit):
+    """One Min / Max row per axis; on_commit(axis_index, (use_min, min, use_max, max))."""
+    for index, (use_min, minimum, use_max, maximum) in enumerate(limits):
+        row = QtWidgets.QHBoxLayout()
+        widgets = []
+        for label, used, value in (("Min", use_min, minimum), ("Max", use_max, maximum)):
+            box = QtWidgets.QCheckBox(label)
+            box.setChecked(used)
+            spin = QtWidgets.QDoubleSpinBox()
+            spin.setRange(-100000.0, 100000.0)
+            spin.setDecimals(3)
+            spin.setValue(value)
+            row.addWidget(box)
+            row.addWidget(spin, 1)
+            widgets.extend([box, spin])
+        for widget in widgets:
+            signal = widget.toggled if isinstance(widget, QtWidgets.QCheckBox) else widget.editingFinished
+            # *_ swallows toggled's checked argument, which would otherwise land in i and pick the wrong axis.
+            signal.connect(lambda *_, i=index, w=widgets: on_commit(
+                i, (w[0].isChecked(), w[1].value(), w[2].isChecked(), w[3].value())))
+        card.body.addRow("XYZ"[index], row)
 
 
 class ArmatureCard(Card):

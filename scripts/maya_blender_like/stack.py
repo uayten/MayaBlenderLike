@@ -17,14 +17,16 @@ Everything is a standard Maya node, so the rig opens and animates without this m
 owner's hierarchy (a skeleton, for instance) is untouched, and FBX exports see normal joints.
 Game engines never receive constraints of any kind: bake animation when exporting.
 
-Limit Location / Rotation / Scale use Maya's transform limits on the owner itself, and IK
-creates an ikHandle; neither takes part in the stack order.
+Limit Location / Rotation / Scale at the bottom use Maya's transform limits on the owner
+itself, which clamp after the whole stack; moved up, a limit becomes a layer that clamps the
+owner's local values at that point. IK creates an ikHandle and takes no part in the order.
 """
 import contextlib
 import json
 import uuid
 
 from maya import cmds
+import maya.api.OpenMaya as om
 
 ROOT_GROUP = "MBL_constraintStacks"
 SPEC_ATTRIBUTE = "mblStackSpecs"
@@ -42,7 +44,13 @@ TYPES = {
     "TRACK_TO": ("Track To", True),
     "LOCKED_TRACK": ("Locked Track", True),
     "STRETCH_TO": ("Stretch To", True),
+    "LIMIT_LOCATION": ("Limit Location", True),
+    "LIMIT_ROTATION": ("Limit Rotation", True),
+    "LIMIT_SCALE": ("Limit Scale", True),
 }
+# Limit layer -> the owner channel it clamps.
+LIMIT_CHANNELS = {"LIMIT_LOCATION": "Translate", "LIMIT_ROTATION": "Rotate", "LIMIT_SCALE": "Scale"}
+UNLIMITED = 1e9
 
 # Blender's Add Constraint menu layout.
 MENU = [
@@ -52,8 +60,7 @@ MENU = [
     ("Relationship", ["CHILD_OF"]),
 ]
 LABELS = dict((k, v[0]) for k, v in TYPES.items())
-LABELS.update({"LIMIT_LOCATION": "Limit Location", "LIMIT_ROTATION": "Limit Rotation",
-               "LIMIT_SCALE": "Limit Scale", "IK": "Inverse Kinematics"})
+LABELS["IK"] = "Inverse Kinematics"
 
 AXIS_VECTORS = {"X": (1, 0, 0), "Y": (0, 1, 0), "Z": (0, 0, 1),
                 "-X": (-1, 0, 0), "-Y": (0, -1, 0), "-Z": (0, 0, -1)}
@@ -72,6 +79,7 @@ def new_spec(constraint_type, target=None):
         "track_axis": "Y",
         "up_axis": "Z",
         "lock_axis": "Z",
+        "limits": [[False, 0.0, False, 0.0] for _ in range(3)],  # per axis: use_min, min, use_max, max
     }
     return spec
 
@@ -144,6 +152,12 @@ def move(owner, spec_id, step):
         build(owner, items)
 
 
+def insert(owner, spec, index):
+    items = specs(owner)
+    items.insert(index, spec)
+    build(owner, items)
+
+
 def apply(owner, spec_id):
     """Blender's Apply: keep the owner where the stack puts it now and remove that constraint."""
     world = cmds.xform(owner, query=True, worldSpace=True, matrix=True)
@@ -168,7 +182,7 @@ def build(owner, items):
         stack = _create_stack_node(owner, items, owner_rest)
         previous = _create_base(owner, stack)
         for index, spec in enumerate(items):
-            previous = _create_layer(previous, index, spec, live.get(spec["id"]))
+            previous = _create_layer(owner, previous, index, spec, live.get(spec["id"]))
         _hide(stack)
         with unlocked(owner):
             cmds.parentConstraint(previous, owner, maintainOffset=False, name=_short(owner) + "_stackParent")
@@ -217,14 +231,16 @@ def _create_base(owner, stack):
     return base
 
 
-def _create_layer(previous, index, spec, live):
+def _create_layer(owner, previous, index, spec, live):
     prefix = "c{}_".format(index)
     rest = _child(previous, prefix + "rest")
     effect = _child(previous, prefix + "effect")
     result = _child(previous, prefix + spec["type"].lower())
 
     target = target_name(spec)
-    if target:
+    if spec["type"] in LIMIT_CHANNELS:
+        _limit_effect(owner, previous, effect, spec)
+    elif target:
         _constrain_effect(effect, target, spec)
 
     cmds.addAttr(result, longName="mblSpecId", dataType="string")
@@ -238,18 +254,26 @@ def _create_layer(previous, index, spec, live):
         cmds.connectAttr(live["curve"] + ".output", result + ".influence", force=True)
 
     # weight(effect) = influence * enabled, weight(rest) = 1 - that: Blender's influence blend.
-    weight = _create_multiply(_short(result) + "_weight")
-    cmds.connectAttr(result + ".influence", weight + ".input1")
-    cmds.connectAttr(result + ".enabled", weight + ".input2")
+    # multiplyDivide exists in every Maya version; Maya 2026's multDL (the renamed
+    # multDoubleLinear) would leave the scene unreadable in older versions.
+    multiply = cmds.createNode("multiplyDivide", name=_short(result) + "_weight")
+    cmds.connectAttr(result + ".influence", multiply + ".input1X")
+    cmds.connectAttr(result + ".enabled", multiply + ".input2X")
+    weight = multiply + ".outputX"
     remainder = cmds.createNode("reverse", name=_short(result) + "_restWeight")
-    cmds.connectAttr(weight + ".output", remainder + ".inputX")
-    for command in (cmds.parentConstraint, cmds.scaleConstraint):
-        constraint = command(effect, rest, result, maintainOffset=False)[0]
-        aliases = command(constraint, query=True, weightAliasList=True)
-        cmds.connectAttr(weight + ".output", "{}.{}".format(constraint, aliases[0]))
-        cmds.connectAttr(remainder + ".outputX", "{}.{}".format(constraint, aliases[1]))
-        if command is cmds.parentConstraint:
-            cmds.setAttr(constraint + ".interpType", 2)  # shortest
+    cmds.connectAttr(weight, remainder + ".inputX")
+    constraint = cmds.parentConstraint(effect, rest, result, maintainOffset=False)[0]
+    aliases = cmds.parentConstraint(constraint, query=True, weightAliasList=True)
+    cmds.connectAttr(weight, "{}.{}".format(constraint, aliases[0]))
+    cmds.connectAttr(remainder + ".outputX", "{}.{}".format(constraint, aliases[1]))
+    cmds.setAttr(constraint + ".interpType", 2)  # shortest
+    # Effect, rest and result are siblings, so scale blends in local values. A scaleConstraint
+    # would work in world space and skew under a non-uniformly scaled, rotated previous layer.
+    scale = cmds.createNode("blendColors", name=_short(result) + "_scale")
+    cmds.connectAttr(effect + ".scale", scale + ".color1")
+    cmds.connectAttr(rest + ".scale", scale + ".color2")
+    cmds.connectAttr(weight, scale + ".blender")
+    cmds.connectAttr(scale + ".output", result + ".scale")
     return result
 
 
@@ -294,6 +318,70 @@ def _constrain_effect(effect, target, spec):
         cmds.connectAttr(distance + ".distance", ratio + ".input1X")
         cmds.setAttr(ratio + ".input2X", rest_length)
         cmds.connectAttr(ratio + ".outputX", "{}.scale{}".format(effect, axis[-1].upper()))
+
+
+def _limit_effect(owner, previous, effect, spec):
+    """Place effect where the owner would be with its local values at this point clamped.
+
+    Joint local matrix: scale * rotate * jointOrient * translate, then offsetParentMatrix and the
+    parent's world. Rotation and scale are read without jointOrient, translation with it, so the
+    clamped values are the ones the owner's own channels would show.
+    """
+    name = _short(effect)
+    parent = cmds.listRelatives(owner, parent=True, fullPath=True)
+    offset = om.MMatrix(cmds.getAttr(owner + ".offsetParentMatrix"))
+    orient = om.MMatrix()
+    if cmds.nodeType(owner) == "joint":
+        orient = om.MEulerRotation([om.MAngle(v, om.MAngle.kDegrees).asRadians()
+                                    for v in cmds.getAttr(owner + ".jointOrient")[0]]).asMatrix()
+
+    def mult(suffix, inputs):
+        node = cmds.createNode("multMatrix", name=name + suffix)
+        for slot, value in enumerate(inputs):
+            plug = "{}.matrixIn[{}]".format(node, slot)
+            if isinstance(value, om.MMatrix):
+                cmds.setAttr(plug, list(value), type="matrix")
+            else:
+                cmds.connectAttr(value, plug)
+        return node + ".matrixSum"
+
+    parent_world = [parent[0] + ".worldMatrix[0]"] if parent else []
+    parent_inverse = [parent[0] + ".worldInverseMatrix[0]"] if parent else []
+    translate_local = mult("_localT", [previous + ".worldMatrix[0]"] + parent_inverse + [offset.inverse()])
+    rotate_local = mult("_localRS", [previous + ".worldMatrix[0]"] + parent_inverse + [(orient * offset).inverse()])
+
+    def read(suffix, local):
+        node = cmds.createNode("decomposeMatrix", name=name + suffix)
+        cmds.connectAttr(local, node + ".inputMatrix")
+        cmds.connectAttr(owner + ".rotateOrder", node + ".inputRotateOrder")
+        return node
+
+    read_translate, read_rotate = read("_readT", translate_local), read("_readRS", rotate_local)
+    values = {"Translate": read_translate + ".outputTranslate",
+              "Rotate": read_rotate + ".outputRotate",
+              "Scale": read_rotate + ".outputScale"}
+
+    channel = LIMIT_CHANNELS[spec["type"]]
+    clamp = cmds.createNode("clamp", name=name + "_clamp")
+    cmds.connectAttr(values[channel], clamp + ".input")
+    for (use_min, minimum, use_max, maximum), color in zip(spec["limits"], "RGB"):
+        cmds.setAttr(clamp + ".min" + color, minimum if use_min else -UNLIMITED)
+        cmds.setAttr(clamp + ".max" + color, maximum if use_max else UNLIMITED)
+    values[channel] = clamp + ".output"
+
+    rotate_scale = cmds.createNode("composeMatrix", name=name + "_writeRS")
+    cmds.connectAttr(values["Rotate"], rotate_scale + ".inputRotate")
+    cmds.connectAttr(values["Scale"], rotate_scale + ".inputScale")
+    cmds.connectAttr(owner + ".rotateOrder", rotate_scale + ".inputRotateOrder")
+    translate = cmds.createNode("composeMatrix", name=name + "_writeT")
+    cmds.connectAttr(values["Translate"], translate + ".inputTranslate")
+    placement = mult("_placement", [rotate_scale + ".outputMatrix", orient, translate + ".outputMatrix", offset]
+                     + parent_world + [previous + ".worldInverseMatrix[0]"])
+    # Into the channels, not offsetParentMatrix: the layer's scaleConstraint reads the scale channel.
+    write = cmds.createNode("decomposeMatrix", name=name + "_write")
+    cmds.connectAttr(placement, write + ".inputMatrix")
+    for channel in ("translate", "rotate", "scale", "shear"):
+        cmds.connectAttr("{}.output{}".format(write, channel.capitalize()), "{}.{}".format(effect, channel))
 
 
 # --- live values kept across rebuilds ---
@@ -356,12 +444,6 @@ def _set_owner_rest_from_world(owner, world):
     _teardown(owner)
     cmds.xform(owner, worldSpace=True, matrix=world)
     build(owner, items)
-
-
-def _create_multiply(name):
-    # Maya 2026 renamed multDoubleLinear to multDL; older versions only have the legacy name.
-    node_type = "multDL" if "multDL" in (cmds.allNodeTypes() or []) else "multDoubleLinear"
-    return cmds.createNode(node_type, name=name)
 
 
 def _child(parent, name):
